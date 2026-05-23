@@ -35,11 +35,13 @@ pub fn run() {
             let settings = config_store.load()?;
             let database = Database::open(app_data_dir.join("app.db"))?;
 
-            app.manage(AppState::new(config_store, settings, database));
+            app.manage(AppState::new(config_store, settings.clone(), database));
             tray::create(app)?;
             
-            if let Err(error) = desktop::windows::spawn_mascot_window(app.handle()) {
-                log::error!("failed to create mascot window: {error}");
+            if settings.show_floating_window {
+                if let Err(error) = desktop::windows::spawn_mascot_window(app.handle()) {
+                    log::error!("failed to create mascot window: {error}");
+                }
             }
 
             desktop::hotkey::start_hotkey_listener(app.handle().clone());

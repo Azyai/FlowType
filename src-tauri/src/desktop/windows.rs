@@ -14,7 +14,8 @@ pub fn show_main_window(app: &AppHandle) -> AppResult<()> {
 }
 
 pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
-    if app.get_webview_window("mascot").is_some() {
+    if let Some(window) = app.get_webview_window("mascot") {
+        window.show().map_err(|error| AppError::Window(error.to_string()))?;
         return Ok(());
     }
 

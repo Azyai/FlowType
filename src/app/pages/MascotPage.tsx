@@ -1,23 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import type { AppStateStatus, VoiceSessionEvent } from '../../types';
-import { hideMascotWindow, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
+import { getSettings, saveSettings, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
 import '../styles/mascot.css';
+
+import { Menu } from '@tauri-apps/api/menu';
+import { translate } from '../../lib/i18n/I18nContext';
+import { resolveLocale } from '../../lib/i18n/locale';
 
 const ACTIVE_STATUSES: AppStateStatus[] = ['Listening', 'Uploading', 'Recognizing'];
 
 export function MascotPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
   const [partial, setPartial] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [locale, setLocale] = useState(resolveLocale('auto'));
   const dragMoved = useRef(false);
+
+  const t = useCallback((key: any) => translate(locale, key), [locale]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('background', 'transparent', 'important');
     document.body.style.setProperty('background', 'transparent', 'important');
     document.getElementById('root')?.style.setProperty('background', 'transparent', 'important');
+
+    getSettings()
+      .then((settings) => setLocale(resolveLocale(settings.locale_preference)))
+      .catch(() => {});
 
     const unlistenVoice = listen<VoiceSessionEvent>('voice_status_changed', (event) => {
       setStatus(event.payload.status);
@@ -79,7 +89,46 @@ export function MascotPage() {
 
   async function handleContextMenu(event: React.MouseEvent) {
     event.preventDefault();
-    setMenuOpen((open) => !open);
+    try {
+      const currentSettings = await getSettings();
+      const currentMode = currentSettings.output_style || 'raw';
+      
+      const menu = await Menu.new({
+        items: [
+          {
+            id: 'settings',
+            text: t('label.settings'),
+            action: openSettingsWindow
+          },
+          {
+            id: 'raw',
+            text: t('output.raw') + (currentMode === 'raw' ? ' ✔' : ''),
+            action: () => setOutputMode('raw')
+          },
+          {
+            id: 'clean',
+            text: t('output.clean') + (currentMode === 'clean' ? ' ✔' : ''),
+            action: () => setOutputMode('clean')
+          },
+          {
+            id: 'formal',
+            text: t('output.formal') + (currentMode === 'formal' ? ' ✔' : ''),
+            action: () => setOutputMode('formal')
+          },
+          {
+            id: 'hide',
+            text: t('label.hideFloatingWindow'),
+            action: async () => {
+              const latest = await getSettings();
+              await saveSettings({ ...latest, show_floating_window: false });
+            }
+          }
+        ]
+      });
+      await menu.popup();
+    } catch (e) {
+      console.warn("Native menu not available, falling back to basic");
+    }
   }
 
   return (
@@ -99,25 +148,6 @@ export function MascotPage() {
         <strong>{status}</strong>
         {partial && <span>{partial}</span>}
       </div>
-      {menuOpen && (
-        <div className="mascot-menu" role="menu">
-          <button type="button" role="menuitem" onClick={openSettingsWindow}>
-            Settings
-          </button>
-          <button type="button" role="menuitem" onClick={() => setOutputMode('raw')}>
-            Raw transcript
-          </button>
-          <button type="button" role="menuitem" onClick={() => setOutputMode('clean')}>
-            Clean text
-          </button>
-          <button type="button" role="menuitem" onClick={() => setOutputMode('formal')}>
-            Formal writing
-          </button>
-          <button type="button" role="menuitem" onClick={() => hideMascotWindow()}>
-            Hide floating window
-          </button>
-        </div>
-      )}
     </div>
   );
 }

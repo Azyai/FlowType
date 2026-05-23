@@ -9,7 +9,7 @@ use crate::{
     desktop::{tray, windows},
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State, Manager};
+use tauri::{AppHandle, State, Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -191,7 +191,20 @@ fn save_settings_and_refresh_tray(
     state: &AppState,
     settings: AppSettings,
 ) -> AppResult<AppSettings> {
+    let show = settings.show_floating_window;
     let saved = state.save_settings(settings)?;
+    
+    // Broadcast setting changes to all windows
+    let _ = app.emit("settings_updated", &saved);
+    
+    if show {
+        let _ = crate::desktop::windows::spawn_mascot_window(app);
+    } else {
+        if let Some(window) = app.get_webview_window("mascot") {
+            let _ = window.hide();
+        }
+    }
+
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after saving settings: {error:?}");
     }
@@ -200,6 +213,7 @@ fn save_settings_and_refresh_tray(
 
 fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResult<AppSettings> {
     let saved = state.reset_settings()?;
+    let _ = app.emit("settings_updated", &saved);
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after resetting settings: {error:?}");
     }
@@ -212,6 +226,7 @@ fn save_output_style_and_refresh_tray(
     output_style: OutputStyle,
 ) -> AppResult<AppSettings> {
     let saved = state.update_output_style(output_style)?;
+    let _ = app.emit("settings_updated", &saved);
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after setting output mode: {error:?}");
     }

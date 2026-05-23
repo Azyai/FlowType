@@ -20,6 +20,8 @@ export type TranslationKey =
   | 'nav.about'
   | 'heading.about'
   | 'label.version'
+  | 'label.settings'
+  | 'label.hideFloatingWindow'
   | 'notice.settingsSaved'
   | 'notice.settingsReset'
   | 'notice.startupEnabled'
