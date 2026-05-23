@@ -1,6 +1,7 @@
 import type { AppStatus } from '../../types';
 import { PageId, pages } from '../config/navigation';
 import { useI18n } from '../../lib/i18n/I18nContext';
+import { startWindowDrag } from '../../lib/windowControls';
 
 export function Sidebar({
   activePage,
@@ -15,7 +16,15 @@ export function Sidebar({
 
   return (
     <aside className="sidebar" aria-label={t('app.settingsSections')}>
-      <div className="brand">
+      <div
+        className="brand"
+        data-tauri-drag-region
+        onMouseDown={(event) => {
+          if (event.button === 0) {
+            void startWindowDrag();
+          }
+        }}
+      >
         <div className="brand-mark">F</div>
         <div>
           <strong>FlowType</strong>

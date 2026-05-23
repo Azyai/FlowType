@@ -1,13 +1,20 @@
 import { Minus, Square, X } from 'lucide-react';
+import type { MouseEvent } from 'react';
 
-import { hideWindow, minimizeWindow, toggleMaximizeWindow } from '../../lib/windowControls';
+import { hideWindow, minimizeWindow, startWindowDrag, toggleMaximizeWindow } from '../../lib/windowControls';
 import { useI18n } from '../../lib/i18n/I18nContext';
 
 export function DesktopTitlebar() {
   const { t } = useI18n();
 
+  function handleDragStart(event: MouseEvent<HTMLElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button')) return;
+    void startWindowDrag();
+  }
+
   return (
-    <header className="desktop-titlebar" data-tauri-drag-region>
+    <header className="desktop-titlebar" data-tauri-drag-region onMouseDown={handleDragStart}>
       <div className="titlebar-drag-zone" data-tauri-drag-region />
 
       <div className="window-controls">
