@@ -2,6 +2,7 @@ import { Activity } from 'lucide-react';
 
 import { DesktopTitlebar } from './app/components/DesktopTitlebar';
 import { FormActions } from './app/components/FormActions';
+import { MascotPage } from './app/pages/MascotPage';
 import { PageHeader } from './app/components/PageHeader';
 import { Sidebar } from './app/components/Sidebar';
 import { Toast } from './app/components/Toast';
@@ -18,6 +19,12 @@ import { I18nContext, translate } from './lib/i18n/I18nContext';
 import { resolveLocale } from './lib/i18n/locale';
 
 export default function App() {
+  const isMascot = new URLSearchParams(window.location.search).get('window') === 'mascot';
+
+  if (isMascot) {
+    return <MascotPage />;
+  }
+
   const shell = useSettingsShell();
   const { activePage, activeTitle, databaseHealth, settings, status } = shell;
 

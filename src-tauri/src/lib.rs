@@ -32,6 +32,13 @@ pub fn run() {
 
             app.manage(AppState::new(config_store, settings, database));
             tray::create(app)?;
+            
+            if let Err(error) = desktop::windows::spawn_mascot_window(app.handle()) {
+                log::error!("failed to create mascot window: {error}");
+            }
+
+            desktop::hotkey::start_hotkey_listener(app.handle().clone());
+            
             Ok(())
         })
         .on_window_event(|window, event| {

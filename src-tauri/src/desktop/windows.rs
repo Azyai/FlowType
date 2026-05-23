@@ -13,6 +13,38 @@ pub fn show_main_window(app: &AppHandle) -> AppResult<()> {
     Ok(())
 }
 
+pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
+    if app.get_webview_window("mascot").is_some() {
+        return Ok(());
+    }
+
+    let window = WebviewWindowBuilder::new(app, "mascot", WebviewUrl::App("/?window=mascot".into()))
+        .title("FlowType Mascot")
+        .inner_size(80.0, 80.0)
+        .resizable(false)
+        .transparent(true)
+        .decorations(false)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .build()
+        .map_err(|error| AppError::Window(error.to_string()))?;
+
+    // Default position to bottom right
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let size = monitor.size();
+        let scale_factor = monitor.scale_factor();
+        let logical_width = (size.width as f64) / scale_factor;
+        let logical_height = (size.height as f64) / scale_factor;
+        
+        let x = logical_width - 80.0 - 40.0;
+        let y = logical_height - 80.0 - 40.0;
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
+    }
+
+    Ok(())
+}
+
 pub fn show_about_window(app: &AppHandle) -> AppResult<()> {
     if let Some(window) = app.get_webview_window("about") {
         window.show().map_err(|error| AppError::Window(error.to_string()))?;

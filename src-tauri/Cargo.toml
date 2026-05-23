@@ -22,6 +22,7 @@ sys-locale = "0.3"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-log = "2"
+rdev = "0.5"
 thiserror = "2"
 
 [dev-dependencies]

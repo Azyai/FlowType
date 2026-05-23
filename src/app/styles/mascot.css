@@ -1,0 +1,128 @@
+/* Desktop Pet Mascot Styles */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.mascot-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent !important;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.mascot-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #4a90e2, #2c3e50);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3), inset 0 -2px 8px rgba(0,0,0,0.5);
+  position: relative;
+  transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.7;
+  -webkit-app-region: drag;
+}
+
+.mascot-avatar:hover {
+  opacity: 0.9;
+}
+
+.mascot-avatar.idle {
+  animation: float 4s ease-in-out infinite;
+}
+
+.mascot-avatar.listening {
+  background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
+  transform: scale(1.1);
+  box-shadow: 0 0 30px rgba(231, 76, 60, 0.6);
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.mascot-avatar.processing {
+  background: radial-gradient(circle at 30% 30%, #f1c40f, #f39c12);
+  animation: spin-slow 2s linear infinite;
+}
+
+.mascot-avatar.injecting {
+  background: radial-gradient(circle at 30% 30%, #2ecc71, #27ae60);
+  animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mascot-tooltip {
+  margin-top: 15px;
+  padding: 6px 16px;
+  background: rgba(30, 30, 30, 0.8);
+  color: white;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.mascot-container:hover .mascot-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(231, 76, 60, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.9); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1.1); }
+}
+
+/* Base parts for mascot */
+.mascot-eyes {
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 18px 0 0 white;
+  transform: translateX(-9px);
+}
+
+.mascot-eyes.blink {
+  animation: blink 4s infinite;
+}
+
+@keyframes blink {
+  0%, 96%, 98% { transform: translateX(-9px) scaleY(1); }
+  97% { transform: translateX(-9px) scaleY(0.1); }
+}

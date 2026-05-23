@@ -6,6 +6,7 @@ export type FloatingWindowPosition = 'bottom_right' | 'cursor_nearby';
 export type UpdateChannel = 'stable' | 'beta' | 'dev';
 export type LocaleCode = 'zh-CN' | 'en-US';
 export type LocalePreference = 'auto' | LocaleCode;
+export type AppStateStatus = 'Idle' | 'Listening' | 'Processing' | 'Injecting';
 
 export interface AppSettings {
   hotkey: string;
