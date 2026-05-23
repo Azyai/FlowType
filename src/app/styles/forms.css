@@ -1,7 +1,7 @@
 .field {
   display: grid;
   gap: 8px;
-  color: #4f5968;
+  color: #374151;
   font-size: 14px;
   font-weight: 700;
 }
@@ -11,35 +11,51 @@ select {
   width: 100%;
   min-height: 42px;
   padding: 0 12px;
-  border: 1px solid #cad3df;
+  border: 1px solid #dde2eb;
   border-radius: 8px;
-  color: #20242c;
+  color: #1c1f24;
   background: #ffffff;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+input:hover,
+select:hover {
+  border-color: #ffb4a8;
+}
+
+input:focus,
+select:focus {
+  border-color: #ff5a4f;
+  box-shadow: 0 0 0 3px rgba(255, 90, 79, 0.14);
+  outline: none;
 }
 
 .switch-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #344054;
+  color: #374151;
 }
 
 .switch-row input {
   width: 18px;
   min-height: 18px;
+  accent-color: #ff5a4f;
 }
 
 .check-list {
   display: grid;
   gap: 10px;
-  color: #4f5968;
+  color: #374151;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  max-width: 720px;
+  max-width: 760px;
   margin-top: 18px;
 }
 
@@ -53,18 +69,32 @@ select {
   padding: 0 14px;
   border-radius: 8px;
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
 }
 
 .primary-button {
   border: 0;
   color: #ffffff;
-  background: #245cdb;
+  background: linear-gradient(135deg, #ff5a4f, #ff7a3d);
+}
+
+.primary-button:hover {
+  background: linear-gradient(135deg, #f24d43, #f97316);
 }
 
 .secondary-button {
-  border: 1px solid #cad3df;
-  color: #2d3748;
+  border: 1px solid #dde2eb;
+  color: #374151;
   background: #ffffff;
+}
+
+.secondary-button:hover {
+  border-color: #ffb4a8;
+  color: #ff5a4f;
+  background: #fff7f3;
 }
 
 .secondary-button svg {

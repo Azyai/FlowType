@@ -14,11 +14,16 @@ export function StatusPage({
   settings: AppSettings;
 }) {
   const { t } = useI18n();
+  const modeLabel = t('status.mode', { mode: '' }).replace(/[:：]\s*$/, '');
 
   return (
     <div className="grid">
-      <InfoCard icon={Power} label={t('status.background')} value={status.paused ? t('status.paused') : t('status.ready')} />
-      <InfoCard icon={Cpu} label={t('status.mode', { mode: '' }).replace(/[:：]\s*$/, '')} value={t('status.mode', { mode: status.current_mode })} />
+      <InfoCard
+        icon={Power}
+        label={t('status.background')}
+        value={status.paused ? t('status.paused') : t('status.ready')}
+      />
+      <InfoCard icon={Cpu} label={modeLabel} value={t('status.mode', { mode: status.current_mode })} />
       <InfoCard
         icon={Database}
         label={t('status.database')}

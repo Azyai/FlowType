@@ -2,10 +2,14 @@ import type { LocaleCode, LocalePreference } from '../../types';
 
 export type TranslationKey =
   | 'app.subtitle'
+  | 'app.settingsSections'
   | 'loading'
   | 'phase'
   | 'status.ready'
   | 'status.paused'
+  | 'window.minimize'
+  | 'window.maximize'
+  | 'window.hide'
   | 'nav.status'
   | 'nav.hotkey'
   | 'nav.voice'

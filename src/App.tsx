@@ -1,5 +1,6 @@
 import { Activity } from 'lucide-react';
 
+import { DesktopTitlebar } from './app/components/DesktopTitlebar';
 import { FormActions } from './app/components/FormActions';
 import { PageHeader } from './app/components/PageHeader';
 import { Sidebar } from './app/components/Sidebar';
@@ -13,17 +14,20 @@ import { OutputPage } from './app/pages/OutputPage';
 import { PermissionsPage } from './app/pages/PermissionsPage';
 import { StatusPage } from './app/pages/StatusPage';
 import { VoicePage } from './app/pages/VoicePage';
-import { I18nContext } from './lib/i18n/I18nContext';
+import { I18nContext, translate } from './lib/i18n/I18nContext';
+import { resolveLocale } from './lib/i18n/locale';
 
 export default function App() {
   const shell = useSettingsShell();
   const { activePage, activeTitle, databaseHealth, settings, status } = shell;
 
   if (!settings || !status || !databaseHealth) {
+    const loadingLocale = resolveLocale('auto');
+
     return (
       <main className="loading-shell">
         <Activity aria-hidden="true" />
-        <span>Loading FlowType</span>
+        <span>{translate(loadingLocale, 'loading')}</span>
       </main>
     );
   }
@@ -36,43 +40,47 @@ export default function App() {
         t: shell.t
       }}
     >
-      <main className="app-shell">
+      <main className="desktop-frame">
         <Sidebar activePage={activePage} status={status} onSelectPage={shell.setActivePage} />
         <Toast toast={shell.toast} />
 
-        <section className="content">
-          <PageHeader title={activeTitle} version={status.app_version} />
+        <section className="workspace">
+          <DesktopTitlebar />
 
-          <form onSubmit={shell.handleSave}>
-            {activePage === 'status' && (
-              <StatusPage status={status} databaseHealth={databaseHealth} settings={settings} />
-            )}
-            {activePage === 'hotkey' && (
-              <HotkeyPage settings={settings} setSettings={shell.setSettings} />
-            )}
-            {activePage === 'voice' && (
-              <VoicePage settings={settings} setSettings={shell.setSettings} />
-            )}
-            {activePage === 'permissions' && <PermissionsPage />}
-            {activePage === 'output' && (
-              <OutputPage settings={settings} setSettings={shell.setSettings} />
-            )}
-            {activePage === 'advanced' && (
-              <AdvancedPage
-                settings={settings}
-                setSettings={shell.setSettings}
-                updateResult={shell.updateResult}
-                onCheckUpdate={shell.handleCheckUpdate}
-                onAutostart={shell.handleAutostart}
-              />
-            )}
-            {activePage === 'history' && <HistoryPage settings={settings} />}
-            {activePage === 'about' && <AboutPage />}
+          <section className="content">
+            <PageHeader title={activeTitle} version={status.app_version} />
 
-            {activePage !== 'status' && activePage !== 'about' && (
-              <FormActions onReset={shell.handleReset} />
-            )}
-          </form>
+            <form onSubmit={shell.handleSave}>
+              {activePage === 'status' && (
+                <StatusPage status={status} databaseHealth={databaseHealth} settings={settings} />
+              )}
+              {activePage === 'hotkey' && (
+                <HotkeyPage settings={settings} setSettings={shell.setSettings} />
+              )}
+              {activePage === 'voice' && (
+                <VoicePage settings={settings} setSettings={shell.setSettings} />
+              )}
+              {activePage === 'permissions' && <PermissionsPage />}
+              {activePage === 'output' && (
+                <OutputPage settings={settings} setSettings={shell.setSettings} />
+              )}
+              {activePage === 'advanced' && (
+                <AdvancedPage
+                  settings={settings}
+                  setSettings={shell.setSettings}
+                  updateResult={shell.updateResult}
+                  onCheckUpdate={shell.handleCheckUpdate}
+                  onAutostart={shell.handleAutostart}
+                />
+              )}
+              {activePage === 'history' && <HistoryPage settings={settings} />}
+              {activePage === 'about' && <AboutPage />}
+
+              {activePage !== 'status' && activePage !== 'about' && (
+                <FormActions onReset={shell.handleReset} />
+              )}
+            </form>
+          </section>
         </section>
       </main>
     </I18nContext.Provider>

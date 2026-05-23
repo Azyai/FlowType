@@ -3,10 +3,14 @@ import type { TranslationDictionary } from './types';
 
 const enUS: TranslationDictionary = {
   'app.subtitle': 'Desktop voice input',
+  'app.settingsSections': 'FlowType settings sections',
   loading: 'Loading FlowType',
   phase: 'Phase 0',
   'status.ready': 'Ready',
   'status.paused': 'Paused',
+  'window.minimize': 'Minimize window',
+  'window.maximize': 'Maximize window',
+  'window.hide': 'Hide to tray',
   'nav.status': 'Status',
   'nav.hotkey': 'Hotkey',
   'nav.voice': 'Voice Model',
@@ -85,10 +89,14 @@ const enUS: TranslationDictionary = {
 
 const zhCN: TranslationDictionary = {
   'app.subtitle': '桌面语音输入',
+  'app.settingsSections': 'FlowType 设置分区',
   loading: '正在加载 FlowType',
   phase: 'Phase 0',
   'status.ready': '就绪',
   'status.paused': '已暂停',
+  'window.minimize': '最小化窗口',
+  'window.maximize': '最大化窗口',
+  'window.hide': '隐藏到托盘',
   'nav.status': '状态',
   'nav.hotkey': '快捷键',
   'nav.voice': '语音模型',
@@ -157,7 +165,8 @@ const zhCN: TranslationDictionary = {
   'history.enabled': '启用',
   'history.disabled': '关闭',
   'history.futureTables': '转写历史表将在历史记录阶段实现。',
-  'about.description': 'FlowType 是一个本地优先的桌面语音输入工具。当前版本建立 Phase 0 桌面基础底座。',
+  'about.description':
+    'FlowType 是一款本地优先的桌面语音输入工具。当前版本用于建立 Phase 0 的桌面基础底座。',
   'update.available': '发现新版本 {version}',
   'update.failed': '更新检查失败',
   'update.channelUnavailable': '当前通道不可用',

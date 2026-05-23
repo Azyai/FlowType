@@ -14,7 +14,7 @@ export function Sidebar({
   const { t } = useI18n();
 
   return (
-    <aside className="sidebar" aria-label="FlowType settings sections">
+    <aside className="sidebar" aria-label={t('app.settingsSections')}>
       <div className="brand">
         <div className="brand-mark">F</div>
         <div>

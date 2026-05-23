@@ -1,5 +1,5 @@
 .loading-shell,
-.app-shell {
+.desktop-frame {
   min-height: 100vh;
 }
 
@@ -8,13 +8,75 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #4f5968;
+  color: #526264;
+  background: #f7f9fc;
 }
 
-.app-shell {
+.desktop-frame {
   display: grid;
-  grid-template-columns: 248px 1fr;
-  background: #f5f7fb;
+  grid-template-columns: 264px minmax(0, 1fr);
+  color: #1c1f24;
+  background: #ffffff;
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.desktop-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  background: #ffffff;
+  user-select: none;
+}
+
+.titlebar-drag-zone {
+  flex: 1;
+  align-self: stretch;
+}
+
+.window-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.window-control {
+  display: grid;
+  width: 32px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: #445066;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.window-control svg {
+  width: 15px;
+  height: 15px;
+}
+
+.window-control:hover {
+  color: #111827;
+  background: #f1f5f9;
+}
+
+.window-control.close:hover {
+  color: #ffffff;
+  background: #ff5a4f;
 }
 
 .sidebar {
@@ -22,9 +84,12 @@
   flex-direction: column;
   gap: 24px;
   min-height: 100vh;
-  padding: 22px 16px;
-  color: #f7fafc;
-  background: #18202d;
+  padding: 40px 24px 28px;
+  color: #1c1f24;
+  background:
+    radial-gradient(circle at 0% 8%, rgba(255, 95, 73, 0.09), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 38%, #f5f7fb 100%);
+  box-shadow: inset -1px 0 0 #edf0f6;
 }
 
 .brand {
@@ -35,13 +100,14 @@
 
 .brand-mark {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 8px;
-  color: #12202a;
-  background: #71e6bc;
+  color: #ffffff;
+  background: #ff5a4f;
   font-weight: 800;
+  box-shadow: 0 8px 18px rgba(255, 90, 79, 0.22);
 }
 
 .brand strong,
@@ -49,15 +115,19 @@
   display: block;
 }
 
+.brand strong {
+  font-size: 19px;
+}
+
 .brand span {
   margin-top: 3px;
-  color: #a9b7c7;
+  color: #7a8190;
   font-size: 13px;
 }
 
 nav {
   display: grid;
-  gap: 6px;
+  gap: 10px;
 }
 
 .sidebar-footer {
@@ -65,13 +135,15 @@ nav {
   align-items: center;
   gap: 9px;
   margin-top: auto;
-  color: #a9b7c7;
+  color: #687082;
   font-size: 14px;
 }
 
 .content {
-  width: min(100%, 1060px);
-  padding: 34px 42px;
+  width: min(100%, 1160px);
+  min-width: 0;
+  padding: 18px 36px 48px;
+  overflow: auto;
 }
 
 .content-header {
@@ -79,28 +151,44 @@ nav {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
 .eyebrow {
-  margin: 0 0 6px;
-  color: #66748a;
+  margin: 0 0 8px;
+  color: #7a8190;
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 @media (max-width: 760px) {
-  .app-shell {
+  body {
+    overflow: auto;
+  }
+
+  .desktop-frame {
     grid-template-columns: 1fr;
+  }
+
+  .workspace {
+    min-height: auto;
+  }
+
+  .desktop-titlebar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
   .sidebar {
     min-height: auto;
+    padding: 22px 18px;
   }
 
   .content {
     padding: 24px 18px;
+    overflow: visible;
   }
 
   .content-header {

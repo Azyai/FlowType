@@ -24,7 +24,7 @@ export function AdvancedPage({
           type="checkbox"
           checked={settings.auto_start}
           onChange={(event) => onAutostart(event.target.checked)}
-          aria-label="Launch FlowType at startup"
+          aria-label={t('advanced.launchAtStartup')}
         />
         <span>{t('advanced.launchAtStartup')}</span>
       </label>
