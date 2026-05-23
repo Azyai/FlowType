@@ -7,6 +7,35 @@ const BUILT_IN_APP_ID: &str = "6c857501";
 const BUILT_IN_API_KEY: &str = "e116bd402a353297f41a7ac7b9bc2bb2";
 const BUILT_IN_API_SECRET: &str = "NWU5NGQ0MDkxZDI4MmU5NDZhOGE3ZDY5";
 
+#[derive(Debug, Clone)]
+pub(crate) struct IflytekCredentials {
+    pub app_id: String,
+    pub api_key: String,
+    pub api_secret: String,
+}
+
+pub(crate) fn credentials_for(settings: &AppSettings) -> Option<IflytekCredentials> {
+    match settings.asr_service_mode {
+        AsrServiceMode::BuiltIn => Some(IflytekCredentials {
+            app_id: BUILT_IN_APP_ID.to_string(),
+            api_key: BUILT_IN_API_KEY.to_string(),
+            api_secret: BUILT_IN_API_SECRET.to_string(),
+        }),
+        AsrServiceMode::CustomDev
+            if !settings.iflytek_app_id.trim().is_empty()
+                && !settings.iflytek_api_key.trim().is_empty()
+                && !settings.iflytek_api_secret.trim().is_empty() =>
+        {
+            Some(IflytekCredentials {
+                app_id: settings.iflytek_app_id.trim().to_string(),
+                api_key: settings.iflytek_api_key.trim().to_string(),
+                api_secret: settings.iflytek_api_secret.trim().to_string(),
+            })
+        }
+        AsrServiceMode::CustomDev => None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AsrServiceStatusKind {

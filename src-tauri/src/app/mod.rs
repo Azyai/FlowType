@@ -1,15 +1,21 @@
 use crate::{
     settings::{AppSettings, ConfigStore, OutputStyle},
     storage::{Database, DatabaseHealth},
+    voice::{
+        state::{VoiceSessionEvent, VoiceStatus, VoiceTrigger},
+        VoiceController,
+    },
     error::{AppError, AppResult},
 };
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
+use tauri::Emitter;
 
 #[derive(Debug)]
 pub struct AppState {
     config_store: ConfigStore,
     settings: Mutex<AppSettings>,
     database: Database,
+    voice: VoiceController,
     paused: AtomicBool,
 }
 
@@ -19,6 +25,7 @@ impl AppState {
             config_store,
             settings: Mutex::new(settings),
             database,
+            voice: VoiceController::default(),
             paused: AtomicBool::new(false),
         }
     }
@@ -52,6 +59,51 @@ impl AppState {
 
     pub fn clear_history(&self) -> AppResult<usize> {
         self.database.clear_transcript_history()
+    }
+
+    pub fn voice_status(&self) -> AppResult<VoiceStatus> {
+        self.voice.status()
+    }
+
+    pub fn start_voice_input(
+        &self,
+        app: &tauri::AppHandle,
+        settings: &AppSettings,
+        trigger: VoiceTrigger,
+    ) -> AppResult<VoiceSessionEvent> {
+        self.voice.start(app, settings, trigger)
+    }
+
+    pub fn stop_voice_input(
+        &self,
+        app: tauri::AppHandle,
+        settings: AppSettings,
+        trigger: VoiceTrigger,
+    ) -> AppResult<VoiceSessionEvent> {
+        self.voice.stop(app, settings, trigger)
+    }
+
+    pub fn cancel_voice_input(&self, app: &tauri::AppHandle) -> AppResult<VoiceSessionEvent> {
+        self.voice.cancel(app)
+    }
+
+    pub fn transition_voice(&self, app: &tauri::AppHandle, status: VoiceStatus) -> AppResult<VoiceSessionEvent> {
+        self.voice.transition(app, status)
+    }
+
+    pub fn emit_voice_event(&self, app: &tauri::AppHandle, event: VoiceSessionEvent) {
+        if let Err(error) = app.emit("voice_status_changed", &event) {
+            log::warn!("failed to emit voice event: {error}");
+        }
+        if let Err(error) = app.emit("status_changed", event.status) {
+            log::warn!("failed to emit legacy voice status: {error}");
+        }
+    }
+
+    pub fn fail_voice(&self, app: &tauri::AppHandle, code: &str, message: impl Into<String>) {
+        let event = VoiceSessionEvent::failed(code, message);
+        self.emit_voice_event(app, event);
+        let _ = self.transition_voice(app, VoiceStatus::Failed);
     }
 
     pub fn toggle_paused(&self) -> bool {

@@ -1,3 +1,14 @@
 [build]
 target-dir = "target"
 jobs = 1
+
+
+[target.x86_64-pc-windows-msvc]
+# 关键：限制每个编译单元的优化，大幅降低内存
+rustflags = [
+    "-C", "codegen-units=256",      # 最大化代码生成单元
+    "-C", "opt-level=0",            # 不做优化
+    "-C", "debuginfo=0",            # 不生成调试信息
+    "-C", "incremental=true",       # 启用增量编译
+    "-C", "lto=false",              # 禁用链接时优化
+]

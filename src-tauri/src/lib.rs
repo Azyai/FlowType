@@ -6,12 +6,15 @@ mod error;
 mod settings;
 mod storage;
 mod updates;
+mod voice;
 
 use app::AppState;
 use commands::{
     check_asr_service, check_update, clear_history, get_app_status, get_asr_service_config,
     get_database_health, get_settings, open_about_window, open_settings_window, quit_app,
-    reset_settings, save_asr_service_config, save_settings, set_autostart, toggle_recording,
+    reset_settings, save_asr_service_config, save_settings, set_autostart, start_voice_input,
+    stop_voice_input, cancel_voice_input, get_voice_status, show_mascot_window, hide_mascot_window,
+    set_output_mode, toggle_recording,
 };
 use desktop::tray;
 use settings::ConfigStore;
@@ -65,6 +68,13 @@ pub fn run() {
             get_database_health,
             clear_history,
             check_update,
+            start_voice_input,
+            stop_voice_input,
+            cancel_voice_input,
+            get_voice_status,
+            show_mascot_window,
+            hide_mascot_window,
+            set_output_mode,
             open_settings_window,
             open_about_window,
             quit_app,

@@ -27,6 +27,8 @@ const settings: AppSettings = {
   history_retention_days: 14,
   vad_enabled: false,
   hotwords_enabled: false,
+  min_recording_ms: 500,
+  max_recording_ms: 60000,
   auto_start: false,
   update_channel: 'stable',
   update_manifest_url: 'mock://updates/stable.json',

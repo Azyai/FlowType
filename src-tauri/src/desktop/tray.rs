@@ -63,6 +63,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 
     let open_settings = MenuItem::with_id(app, "open_settings", labels.open_settings, true, None::<&str>)?;
     let pause_voice = MenuItem::with_id(app, "pause_voice", pause_label, true, None::<&str>)?;
+    let show_mascot = MenuItem::with_id(app, "show_mascot", labels.show_mascot, true, None::<&str>)?;
     let mode_raw = MenuItem::with_id(app, "mode_raw", labels.mode_raw, true, None::<&str>)?;
     let mode_clean = MenuItem::with_id(app, "mode_clean", labels.mode_clean, true, None::<&str>)?;
     let mode_formal = MenuItem::with_id(app, "mode_formal", labels.mode_formal, true, None::<&str>)?;
@@ -81,6 +82,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &open_settings,
             &pause_voice,
+            &show_mascot,
             &separator_one,
             &mode_raw,
             &mode_clean,
@@ -105,6 +107,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) -> AppResult<()> {
             refresh(app)?;
             Ok(())
         }
+        "show_mascot" => windows::spawn_mascot_window(app),
         "mode_raw" => set_mode(app, OutputStyle::Raw),
         "mode_clean" => set_mode(app, OutputStyle::Clean),
         "mode_formal" => set_mode(app, OutputStyle::Formal),

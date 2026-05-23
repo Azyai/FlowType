@@ -25,6 +25,14 @@ tauri-plugin-log = "2"
 rdev = "0.5"
 lazy_static = "1.4"
 thiserror = "2"
+arboard = "3"
+base64 = "0.22"
+cpal = "0.15"
+hmac = "0.12"
+httpdate = "1"
+sha2 = "0.10"
+tungstenite = { version = "0.24", default-features = false, features = ["native-tls", "handshake"] }
+urlencoding = "2"
 
 [dev-dependencies]
 pretty_assertions = "1"

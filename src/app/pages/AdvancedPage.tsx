@@ -120,6 +120,32 @@ export function AdvancedPage({
         />
         <span>{t('advanced.hotwords')}</span>
       </label>
+      <label className="field">
+        <span>{t('advanced.minRecording')}</span>
+        <input
+          type="number"
+          min={0}
+          step={100}
+          value={settings.min_recording_ms}
+          aria-label={t('advanced.minRecording')}
+          onChange={(event) =>
+            setSettings({ ...settings, min_recording_ms: Number(event.target.value) || 0 })
+          }
+        />
+      </label>
+      <label className="field">
+        <span>{t('advanced.maxRecording')}</span>
+        <input
+          type="number"
+          min={1000}
+          step={1000}
+          value={settings.max_recording_ms}
+          aria-label={t('advanced.maxRecording')}
+          onChange={(event) =>
+            setSettings({ ...settings, max_recording_ms: Number(event.target.value) || 60000 })
+          }
+        />
+      </label>
 
       <label className="field">
         <span>{t('advanced.displayLanguage')}</span>

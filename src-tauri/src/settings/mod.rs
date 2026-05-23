@@ -6,7 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputMode {
     HoldToTalk,
@@ -48,7 +48,7 @@ fn default_iflytek_retry_count() -> u8 {
     1
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputStyle {
     Raw,
@@ -56,7 +56,7 @@ pub enum OutputStyle {
     Formal,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClipboardRestore {
     Always,
@@ -65,7 +65,7 @@ pub enum ClipboardRestore {
     TextOnly,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FloatingWindowPosition {
     BottomRight,
@@ -100,6 +100,14 @@ fn default_history_retention_days() -> u16 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_min_recording_ms() -> u64 {
+    500
+}
+
+fn default_max_recording_ms() -> u64 {
+    60_000
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +146,10 @@ pub struct AppSettings {
     pub vad_enabled: bool,
     #[serde(default)]
     pub hotwords_enabled: bool,
+    #[serde(default = "default_min_recording_ms")]
+    pub min_recording_ms: u64,
+    #[serde(default = "default_max_recording_ms")]
+    pub max_recording_ms: u64,
     pub auto_start: bool,
     pub update_channel: UpdateChannel,
     pub update_manifest_url: String,
@@ -169,6 +181,8 @@ impl Default for AppSettings {
             history_retention_days: 14,
             vad_enabled: false,
             hotwords_enabled: false,
+            min_recording_ms: 500,
+            max_recording_ms: 60_000,
             auto_start: false,
             update_channel: UpdateChannel::Stable,
             update_manifest_url: "mock://updates/stable.json".to_string(),
@@ -272,6 +286,8 @@ mod tests {
         assert_eq!(settings.history_retention_days, 14);
         assert!(!settings.vad_enabled);
         assert!(!settings.hotwords_enabled);
+        assert_eq!(settings.min_recording_ms, 500);
+        assert_eq!(settings.max_recording_ms, 60_000);
         assert!(!settings.auto_start);
         assert_eq!(settings.update_channel, UpdateChannel::Stable);
         assert_eq!(settings.update_manifest_url, "mock://updates/stable.json");
@@ -309,6 +325,8 @@ mod tests {
         assert_eq!(loaded.output_style, OutputStyle::Clean);
         assert_eq!(loaded.history_retention_days, 14);
         assert_eq!(loaded.iflytek_api_secret, "");
+        assert_eq!(loaded.min_recording_ms, 500);
+        assert_eq!(loaded.max_recording_ms, 60_000);
     }
 
     #[test]

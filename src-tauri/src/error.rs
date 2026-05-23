@@ -27,6 +27,12 @@ pub enum AppError {
     AsrServiceUnavailable(String),
     #[error("history storage operation failed")]
     HistoryStorage(String),
+    #[error("voice input operation failed: {0}")]
+    Voice(String),
+    #[error("audio capture failed: {0}")]
+    Audio(String),
+    #[error("text injection failed: {0}")]
+    TextInjection(String),
     #[error("internal state lock failed")]
     StateLock,
 }
@@ -43,6 +49,9 @@ impl From<AppError> for ErrorResponse {
             AppError::AsrConfigMissing(_) => "ASR_CONFIG_MISSING",
             AppError::AsrServiceUnavailable(_) => "ASR_SERVICE_UNAVAILABLE",
             AppError::HistoryStorage(_) => "HISTORY_STORAGE",
+            AppError::Voice(_) => "VOICE_INPUT",
+            AppError::Audio(_) => "AUDIO_CAPTURE",
+            AppError::TextInjection(_) => "TEXT_INJECTION",
             AppError::StateLock => "STATE_LOCK",
         };
 

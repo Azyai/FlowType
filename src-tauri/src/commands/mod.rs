@@ -2,13 +2,14 @@ use crate::{
     asr::{self, AsrServiceCheckResult, AsrServiceConfig},
     settings::{AppSettings, OutputStyle},
     storage::DatabaseHealth,
+    voice::state::{VoiceSessionEvent, VoiceStatus, VoiceTrigger},
     error::{AppError, AppResult, CommandResult, ErrorResponse},
     app::AppState,
     updates::{self, UpdateCheckResult},
     desktop::{tray, windows},
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State, Manager, Emitter};
+use tauri::{AppHandle, State, Manager};
 use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,25 +38,13 @@ pub struct AsrServiceConfigInput {
 }
 
 #[tauri::command]
-pub fn toggle_recording(app: AppHandle) -> CommandResult<()> {
-    let currently_recording = crate::desktop::hotkey::IS_RECORDING.load(std::sync::atomic::Ordering::SeqCst);
-    if currently_recording {
-        crate::desktop::hotkey::IS_RECORDING.store(false, std::sync::atomic::Ordering::SeqCst);
-        let _ = app.emit("status_changed", "Processing");
-        
-        let app_handle_clone = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = app_handle_clone.emit("status_changed", "Injecting");
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            let _ = app_handle_clone.emit("status_changed", "Idle");
-        });
+pub fn toggle_recording(app: AppHandle, state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    let status = state.voice_status().map_err(error_response)?;
+    if status == VoiceStatus::Listening {
+        stop_voice_input(app, state, VoiceTrigger::Mascot)
     } else {
-        crate::desktop::hotkey::IS_RECORDING.store(true, std::sync::atomic::Ordering::SeqCst);
-        let _ = app.emit("status_changed", "Listening");
+        start_voice_input(app, state, VoiceTrigger::Mascot)
     }
-    
-    Ok(().into())
 }
 
 #[tauri::command]
@@ -126,6 +115,49 @@ pub fn clear_history(state: State<AppState>) -> CommandResult<ClearHistoryResult
 }
 
 #[tauri::command]
+pub fn start_voice_input(
+    app: AppHandle,
+    state: State<AppState>,
+    trigger: VoiceTrigger,
+) -> CommandResult<VoiceSessionEvent> {
+    let settings = state.settings().map_err(error_response)?;
+    into_command(state.start_voice_input(&app, &settings, trigger))
+}
+
+#[tauri::command]
+pub fn stop_voice_input(
+    app: AppHandle,
+    state: State<AppState>,
+    trigger: VoiceTrigger,
+) -> CommandResult<VoiceSessionEvent> {
+    let settings = state.settings().map_err(error_response)?;
+    into_command(state.stop_voice_input(app, settings, trigger))
+}
+
+#[tauri::command]
+pub fn cancel_voice_input(app: AppHandle, state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    into_command(state.cancel_voice_input(&app))
+}
+
+#[tauri::command]
+pub fn get_voice_status(state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    into_command(state.voice_status().map(VoiceSessionEvent::status))
+}
+
+#[tauri::command]
+pub fn show_mascot_window(app: AppHandle) -> CommandResult<()> {
+    into_command(windows::spawn_mascot_window(&app))
+}
+
+#[tauri::command]
+pub fn hide_mascot_window(app: AppHandle) -> CommandResult<()> {
+    let Some(window) = app.get_webview_window("mascot") else {
+        return Ok(());
+    };
+    into_command(window.hide().map_err(|error| AppError::Window(error.to_string())))
+}
+
+#[tauri::command]
 pub async fn open_settings_window(app: AppHandle) -> CommandResult<()> {
     into_command(windows::show_main_window(&app))
 }
@@ -145,6 +177,15 @@ pub fn set_output_style(state: &AppState, output_style: OutputStyle) -> CommandR
     into_command(state.update_output_style(output_style))
 }
 
+#[tauri::command]
+pub fn set_output_mode(
+    app: AppHandle,
+    state: State<AppState>,
+    output_style: OutputStyle,
+) -> CommandResult<AppSettings> {
+    into_command(save_output_style_and_refresh_tray(&app, &state, output_style))
+}
+
 fn save_settings_and_refresh_tray(
     app: &AppHandle,
     state: &AppState,
@@ -161,6 +202,18 @@ fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResu
     let saved = state.reset_settings()?;
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after resetting settings: {error:?}");
+    }
+    Ok(saved)
+}
+
+fn save_output_style_and_refresh_tray(
+    app: &AppHandle,
+    state: &AppState,
+    output_style: OutputStyle,
+) -> AppResult<AppSettings> {
+    let saved = state.update_output_style(output_style)?;
+    if let Err(error) = tray::refresh(app) {
+        log::warn!("failed to refresh tray after setting output mode: {error:?}");
     }
     Ok(saved)
 }
@@ -218,9 +271,11 @@ fn update_check(state: &AppState) -> AppResult<UpdateCheckResult> {
 }
 
 fn into_command<T>(result: AppResult<T>) -> CommandResult<T> {
-    result.map_err(|error| {
-        let response: ErrorResponse = error.into();
-        log::error!("{}: {}", response.code, response.message);
-        response
-    })
+    result.map_err(error_response)
+}
+
+fn error_response(error: AppError) -> ErrorResponse {
+    let response: ErrorResponse = error.into();
+    log::error!("{}: {}", response.code, response.message);
+    response
 }

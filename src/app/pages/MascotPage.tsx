@@ -1,36 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { AppStateStatus } from '../../types';
+
+import type { AppStateStatus, VoiceSessionEvent } from '../../types';
+import { hideMascotWindow, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
 import '../styles/mascot.css';
+
+const ACTIVE_STATUSES: AppStateStatus[] = ['Listening', 'Uploading', 'Recognizing'];
 
 export function MascotPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
+  const [partial, setPartial] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const dragMoved = useRef(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty('background', 'transparent', 'important');
     document.body.style.setProperty('background', 'transparent', 'important');
-    const root = document.getElementById('root');
-    if (root) {
-      root.style.setProperty('background', 'transparent', 'important');
-    }
+    document.getElementById('root')?.style.setProperty('background', 'transparent', 'important');
 
-    const unlisten = listen<AppStateStatus>('status_changed', (event) => {
+    const unlistenVoice = listen<VoiceSessionEvent>('voice_status_changed', (event) => {
+      setStatus(event.payload.status);
+      if (event.payload.transcript_partial) {
+        setPartial(event.payload.transcript_partial);
+      }
+      if (event.payload.transcript_final) {
+        setPartial(event.payload.transcript_final);
+      }
+      if (event.payload.status === 'Idle') {
+        setPartial('');
+      }
+    });
+    const unlistenLegacy = listen<AppStateStatus>('status_changed', (event) => {
       setStatus(event.payload);
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenVoice.then((fn) => fn());
+      unlistenLegacy.then((fn) => fn());
     };
   }, []);
 
-  const handleMouseDown = async (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
+  async function handleMouseDown(event: React.MouseEvent) {
+    if (event.button !== 0) return;
     dragMoved.current = false;
-    const startX = e.screenX;
-    const startY = e.screenY;
+    const startX = event.screenX;
+    const startY = event.screenY;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const dx = Math.abs(moveEvent.screenX - startX);
@@ -50,26 +65,59 @@ export function MascotPage() {
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-  };
+  }
 
-  const handleDoubleClick = async () => {
+  async function handleDoubleClick() {
     if (dragMoved.current) return;
-    try {
-      await invoke('toggle_recording');
-    } catch (err) {
-      console.error('Failed to toggle recording:', err);
+    if (ACTIVE_STATUSES.includes(status)) {
+      await stopVoiceInput('mascot');
+    } else {
+      setPartial('');
+      await startVoiceInput('mascot');
     }
-  };
+  }
+
+  async function handleContextMenu(event: React.MouseEvent) {
+    event.preventDefault();
+    setMenuOpen((open) => !open);
+  }
 
   return (
-    <div className="mascot-container">
-      <div
+    <div className="mascot-container" onContextMenu={handleContextMenu}>
+      <button
+        type="button"
+        aria-label="FlowType voice mascot"
         className={`mascot-avatar ${status.toLowerCase()}`}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       >
-        <div className="mascot-eyes blink"></div>
+        <span className="mascot-face" aria-hidden="true">
+          <span className="mascot-eyes blink" />
+        </span>
+      </button>
+      <div className="mascot-tooltip">
+        <strong>{status}</strong>
+        {partial && <span>{partial}</span>}
       </div>
+      {menuOpen && (
+        <div className="mascot-menu" role="menu">
+          <button type="button" role="menuitem" onClick={openSettingsWindow}>
+            Settings
+          </button>
+          <button type="button" role="menuitem" onClick={() => setOutputMode('raw')}>
+            Raw transcript
+          </button>
+          <button type="button" role="menuitem" onClick={() => setOutputMode('clean')}>
+            Clean text
+          </button>
+          <button type="button" role="menuitem" onClick={() => setOutputMode('formal')}>
+            Formal writing
+          </button>
+          <button type="button" role="menuitem" onClick={() => hideMascotWindow()}>
+            Hide floating window
+          </button>
+        </div>
+      )}
     </div>
   );
 }

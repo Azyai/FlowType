@@ -14,7 +14,10 @@ import type {
   AsrServiceConfig,
   ClearHistoryResult,
   DatabaseHealth,
-  UpdateCheckResult
+  UpdateCheckResult,
+  VoiceSessionEvent,
+  VoiceTrigger,
+  OutputStyle
 } from '../types';
 
 const isTauriRuntime = () => Boolean('__TAURI_INTERNALS__' in window);
@@ -89,6 +92,61 @@ export function checkAsrService(): Promise<AsrServiceCheckResult> {
 
 export function clearHistory(): Promise<ClearHistoryResult> {
   return nativeInvoke('clear_history', undefined, { deleted_count: 0 });
+}
+
+export function startVoiceInput(trigger: VoiceTrigger): Promise<VoiceSessionEvent> {
+  return nativeInvoke('start_voice_input', { trigger }, {
+    status: 'Listening',
+    transcript_partial: null,
+    transcript_final: null,
+    error_code: null,
+    message: null
+  });
+}
+
+export function stopVoiceInput(trigger: VoiceTrigger): Promise<VoiceSessionEvent> {
+  return nativeInvoke('stop_voice_input', { trigger }, {
+    status: 'Uploading',
+    transcript_partial: null,
+    transcript_final: null,
+    error_code: null,
+    message: null
+  });
+}
+
+export function cancelVoiceInput(): Promise<VoiceSessionEvent> {
+  return nativeInvoke('cancel_voice_input', undefined, {
+    status: 'Idle',
+    transcript_partial: null,
+    transcript_final: null,
+    error_code: null,
+    message: null
+  });
+}
+
+export function getVoiceStatus(): Promise<VoiceSessionEvent> {
+  return nativeInvoke('get_voice_status', undefined, {
+    status: 'Idle',
+    transcript_partial: null,
+    transcript_final: null,
+    error_code: null,
+    message: null
+  });
+}
+
+export function showMascotWindow(): Promise<void> {
+  return nativeInvoke('show_mascot_window', undefined, undefined);
+}
+
+export function hideMascotWindow(): Promise<void> {
+  return nativeInvoke('hide_mascot_window', undefined, undefined);
+}
+
+export function setOutputMode(output_style: OutputStyle): Promise<AppSettings> {
+  return nativeInvoke('set_output_mode', { outputStyle: output_style, output_style }, {
+    ...defaultSettings,
+    output_style
+  });
 }
 
 export function openSettingsWindow(): Promise<void> {

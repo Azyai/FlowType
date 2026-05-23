@@ -8,7 +8,8 @@ export type FloatingWindowPosition = 'bottom_right' | 'cursor_nearby';
 export type UpdateChannel = 'stable' | 'beta' | 'dev';
 export type LocaleCode = 'zh-CN' | 'en-US';
 export type LocalePreference = 'auto' | LocaleCode;
-export type AppStateStatus = 'Idle' | 'Listening' | 'Processing' | 'Injecting';
+export type AppStateStatus = 'Idle' | 'Listening' | 'Uploading' | 'Recognizing' | 'Injecting' | 'Success' | 'Failed';
+export type VoiceTrigger = 'hotkey' | 'mascot' | 'tray';
 
 export interface AppSettings {
   hotkey: string;
@@ -31,6 +32,8 @@ export interface AppSettings {
   history_retention_days: HistoryRetentionDays;
   vad_enabled: boolean;
   hotwords_enabled: boolean;
+  min_recording_ms: number;
+  max_recording_ms: number;
   auto_start: boolean;
   update_channel: UpdateChannel;
   update_manifest_url: string;
@@ -88,6 +91,14 @@ export interface AsrServiceCheckResult {
 
 export interface ClearHistoryResult {
   deleted_count: number;
+}
+
+export interface VoiceSessionEvent {
+  status: AppStateStatus;
+  transcript_partial: string | null;
+  transcript_final: string | null;
+  error_code: string | null;
+  message: string | null;
 }
 
 export interface NativeErrorShape {
