@@ -17,7 +17,7 @@ export function StatusPage({
   const modeLabel = t('status.mode', { mode: '' }).replace(/[:：]\s*$/, '');
 
   return (
-    <div className="grid">
+    <div className="grid status-grid">
       <InfoCard
         icon={Power}
         label={t('status.background')}
