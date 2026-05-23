@@ -4,7 +4,7 @@ use crate::{
     error::{AppError, AppResult, CommandResult, ErrorResponse},
     app::AppState,
     updates::{self, UpdateCheckResult},
-    desktop::windows,
+    desktop::{tray, windows},
 };
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -24,13 +24,17 @@ pub fn get_settings(state: State<AppState>) -> CommandResult<AppSettings> {
 }
 
 #[tauri::command]
-pub fn save_settings(state: State<AppState>, settings: AppSettings) -> CommandResult<AppSettings> {
-    into_command(state.save_settings(settings))
+pub fn save_settings(
+    app: AppHandle,
+    state: State<AppState>,
+    settings: AppSettings,
+) -> CommandResult<AppSettings> {
+    into_command(save_settings_and_refresh_tray(&app, &state, settings))
 }
 
 #[tauri::command]
-pub fn reset_settings(state: State<AppState>) -> CommandResult<AppSettings> {
-    into_command(state.reset_settings())
+pub fn reset_settings(app: AppHandle, state: State<AppState>) -> CommandResult<AppSettings> {
+    into_command(reset_settings_and_refresh_tray(&app, &state))
 }
 
 #[tauri::command]
@@ -75,6 +79,26 @@ pub fn quit_app(app: AppHandle) -> CommandResult<()> {
 
 pub fn set_output_style(state: &AppState, output_style: OutputStyle) -> CommandResult<AppSettings> {
     into_command(state.update_output_style(output_style))
+}
+
+fn save_settings_and_refresh_tray(
+    app: &AppHandle,
+    state: &AppState,
+    settings: AppSettings,
+) -> AppResult<AppSettings> {
+    let saved = state.save_settings(settings)?;
+    if let Err(error) = tray::refresh(app) {
+        log::warn!("failed to refresh tray after saving settings: {error:?}");
+    }
+    Ok(saved)
+}
+
+fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResult<AppSettings> {
+    let saved = state.reset_settings()?;
+    if let Err(error) = tray::refresh(app) {
+        log::warn!("failed to refresh tray after resetting settings: {error:?}");
+    }
+    Ok(saved)
 }
 
 pub fn app_status(state: &AppState) -> AppResult<AppStatus> {

@@ -1,8 +1,9 @@
 use crate::{
+    app::AppState,
     commands,
+    desktop::tray_i18n::{mode_label, tray_labels},
     settings::OutputStyle,
     error::{AppError, AppResult},
-    app::AppState,
     desktop::windows,
 };
 use tauri::{
@@ -13,35 +14,7 @@ use tauri::{
 };
 
 pub fn create(app: &App) -> tauri::Result<()> {
-    let open_settings = MenuItem::with_id(app, "open_settings", "Open Settings", true, None::<&str>)?;
-    let pause_voice = MenuItem::with_id(app, "pause_voice", "Pause Voice Input", true, None::<&str>)?;
-    let mode_raw = MenuItem::with_id(app, "mode_raw", "Mode: Raw", true, None::<&str>)?;
-    let mode_clean = MenuItem::with_id(app, "mode_clean", "Mode: Clean", true, None::<&str>)?;
-    let mode_formal = MenuItem::with_id(app, "mode_formal", "Mode: Formal", true, None::<&str>)?;
-    let check_microphone =
-        MenuItem::with_id(app, "check_microphone", "Check Microphone", true, None::<&str>)?;
-    let view_history = MenuItem::with_id(app, "view_history", "View History", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit FlowType", true, None::<&str>)?;
-    let separator_one = PredefinedMenuItem::separator(app)?;
-    let separator_two = PredefinedMenuItem::separator(app)?;
-    let separator_three = PredefinedMenuItem::separator(app)?;
-
-    let menu = Menu::with_items(
-        app,
-        &[
-            &open_settings,
-            &pause_voice,
-            &separator_one,
-            &mode_raw,
-            &mode_clean,
-            &mode_formal,
-            &separator_two,
-            &check_microphone,
-            &view_history,
-            &separator_three,
-            &quit,
-        ],
-    )?;
+    let menu = build_menu(app.app_handle())?;
 
     TrayIconBuilder::with_id("main")
         .icon(create_icon())
@@ -57,6 +30,70 @@ pub fn create(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
+pub fn refresh(app: &AppHandle) -> AppResult<()> {
+    let menu = build_menu(app).map_err(|error| AppError::Window(error.to_string()))?;
+    let Some(tray) = app.tray_by_id("main") else {
+        return Err(AppError::Window("main tray is not registered".to_string()));
+    };
+
+    tray.set_menu(Some(menu))
+        .map_err(|error| AppError::Window(error.to_string()))?;
+    Ok(())
+}
+
+fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let (labels, paused, output_style) = app
+        .try_state::<AppState>()
+        .and_then(|state| {
+            state
+                .settings()
+                .ok()
+                .map(|settings| (tray_labels(&settings.locale_preference), state.paused(), settings.output_style))
+        })
+        .unwrap_or_else(|| {
+            let labels = tray_labels(&crate::settings::LocalePreference::Auto);
+            (labels, false, OutputStyle::Clean)
+        });
+
+    let pause_label = if paused {
+        labels.resume_voice
+    } else {
+        labels.pause_voice
+    };
+
+    let open_settings = MenuItem::with_id(app, "open_settings", labels.open_settings, true, None::<&str>)?;
+    let pause_voice = MenuItem::with_id(app, "pause_voice", pause_label, true, None::<&str>)?;
+    let mode_raw = MenuItem::with_id(app, "mode_raw", labels.mode_raw, true, None::<&str>)?;
+    let mode_clean = MenuItem::with_id(app, "mode_clean", labels.mode_clean, true, None::<&str>)?;
+    let mode_formal = MenuItem::with_id(app, "mode_formal", labels.mode_formal, true, None::<&str>)?;
+    let check_microphone =
+        MenuItem::with_id(app, "check_microphone", labels.check_microphone, true, None::<&str>)?;
+    let view_history = MenuItem::with_id(app, "view_history", labels.view_history, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;
+    let separator_one = PredefinedMenuItem::separator(app)?;
+    let separator_two = PredefinedMenuItem::separator(app)?;
+    let separator_three = PredefinedMenuItem::separator(app)?;
+
+    log::debug!("building tray menu with current {}", mode_label(labels, &output_style));
+
+    Menu::with_items(
+        app,
+        &[
+            &open_settings,
+            &pause_voice,
+            &separator_one,
+            &mode_raw,
+            &mode_clean,
+            &mode_formal,
+            &separator_two,
+            &check_microphone,
+            &view_history,
+            &separator_three,
+            &quit,
+        ],
+    )
+}
+
 fn handle_menu_event(app: &AppHandle, id: &str) -> AppResult<()> {
     match id {
         "open_settings" => windows::show_main_window(app),
@@ -65,6 +102,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) -> AppResult<()> {
                 let paused = state.toggle_paused();
                 log::info!("voice input paused: {paused}");
             }
+            refresh(app)?;
             Ok(())
         }
         "mode_raw" => set_mode(app, OutputStyle::Raw),
@@ -94,6 +132,7 @@ fn set_mode(app: &AppHandle, output_style: OutputStyle) -> AppResult<()> {
     commands::set_output_style(&state, output_style).map_err(|error| {
         AppError::Window(format!("failed to update output mode: {}", error.message))
     })?;
+    refresh(app)?;
     Ok(())
 }
 
