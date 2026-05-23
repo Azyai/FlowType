@@ -3,6 +3,7 @@ import { Activity } from 'lucide-react';
 import { FormActions } from './app/components/FormActions';
 import { PageHeader } from './app/components/PageHeader';
 import { Sidebar } from './app/components/Sidebar';
+import { Toast } from './app/components/Toast';
 import { useSettingsShell } from './app/hooks/useSettingsShell';
 import { AboutPage } from './app/pages/AboutPage';
 import { AdvancedPage } from './app/pages/AdvancedPage';
@@ -16,7 +17,7 @@ import { I18nContext } from './lib/i18n/I18nContext';
 
 export default function App() {
   const shell = useSettingsShell();
-  const { activePage, activeTitle, databaseHealth, error, notice, settings, status } = shell;
+  const { activePage, activeTitle, databaseHealth, settings, status } = shell;
 
   if (!settings || !status || !databaseHealth) {
     return (
@@ -37,12 +38,10 @@ export default function App() {
     >
       <main className="app-shell">
         <Sidebar activePage={activePage} status={status} onSelectPage={shell.setActivePage} />
+        <Toast toast={shell.toast} />
 
         <section className="content">
           <PageHeader title={activeTitle} version={status.app_version} />
-
-          {notice && <p className="notice">{notice}</p>}
-          {error && <p className="error">{error}</p>}
 
           <form onSubmit={shell.handleSave}>
             {activePage === 'status' && (

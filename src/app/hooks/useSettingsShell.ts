@@ -15,14 +15,18 @@ import { resolveLocale } from '../../lib/i18n/locale';
 import { translate } from '../../lib/i18n/I18nContext';
 import type { AppSettings, AppStatus, DatabaseHealth, UpdateCheckResult } from '../../types';
 
+export interface ToastState {
+  kind: 'success' | 'error';
+  message: string;
+}
+
 export function useSettingsShell() {
   const [activePage, setActivePage] = useState<PageId>('status');
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [databaseHealth, setDatabaseHealth] = useState<DatabaseHealth | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -41,7 +45,7 @@ export function useSettingsShell() {
         setDatabaseHealth(loadedDatabaseHealth);
       } catch (loadError) {
         if (!alive) return;
-        setError(readableError(loadError));
+        showToast('error', readableError(loadError));
       }
     }
 
@@ -62,6 +66,20 @@ export function useSettingsShell() {
   );
   const activeTitle = useMemo(() => t(pageTitleKey(activePage)), [activePage, t]);
 
+  useEffect(() => {
+    if (!toast) return;
+
+    const timeout = window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  function showToast(kind: ToastState['kind'], message: string) {
+    setToast({ kind, message });
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!settings) return;
@@ -69,10 +87,9 @@ export function useSettingsShell() {
     try {
       const saved = await saveSettings(settings);
       setSettings(saved);
-      setNotice(t('notice.settingsSaved'));
-      setError(null);
+      showToast('success', t('notice.settingsSaved'));
     } catch (saveError) {
-      setError(readableError(saveError));
+      showToast('error', readableError(saveError));
     }
   }
 
@@ -80,10 +97,9 @@ export function useSettingsShell() {
     try {
       const next = await resetSettings();
       setSettings(next);
-      setNotice(t('notice.settingsReset'));
-      setError(null);
+      showToast('success', t('notice.settingsReset'));
     } catch (resetError) {
-      setError(readableError(resetError));
+      showToast('error', readableError(resetError));
     }
   }
 
@@ -94,11 +110,10 @@ export function useSettingsShell() {
     try {
       const saved = await setAutostart(enabled);
       setSettings(saved);
-      setNotice(enabled ? t('notice.startupEnabled') : t('notice.startupDisabled'));
-      setError(null);
+      showToast('success', enabled ? t('notice.startupEnabled') : t('notice.startupDisabled'));
     } catch (autostartError) {
       setSettings({ ...settings, auto_start: !enabled });
-      setError(readableError(autostartError));
+      showToast('error', readableError(autostartError));
     }
   }
 
@@ -106,9 +121,8 @@ export function useSettingsShell() {
     try {
       const result = await checkUpdate();
       setUpdateResult(result);
-      setError(null);
     } catch (updateError) {
-      setError(readableError(updateError));
+      showToast('error', readableError(updateError));
     }
   }
 
@@ -116,19 +130,18 @@ export function useSettingsShell() {
     activePage,
     activeTitle,
     databaseHealth,
-    error,
     handleAutostart,
     handleCheckUpdate,
     handleReset,
     handleSave,
     locale,
     localePreference: settings?.locale_preference ?? 'auto',
-    notice,
     setActivePage,
     setSettings,
     settings,
     status,
     t,
+    toast,
     updateResult
   };
 }

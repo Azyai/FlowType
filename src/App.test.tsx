@@ -26,6 +26,7 @@ describe('FlowType settings shell', () => {
   const originalLanguage = navigator.language;
 
   beforeEach(() => {
+    vi.useRealTimers();
     Object.defineProperty(navigator, 'language', {
       value: 'en-US',
       configurable: true
@@ -56,6 +57,7 @@ describe('FlowType settings shell', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     Object.defineProperty(navigator, 'language', {
       value: originalLanguage,
       configurable: true
@@ -165,6 +167,24 @@ describe('FlowType settings shell', () => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({ locale_preference: 'zh-CN' })
       );
+    });
+  });
+
+  test('shows global feedback as a top toast and hides it after three seconds', async () => {
+    vi.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Status' });
+    await user.click(screen.getByRole('button', { name: 'Hotkey' }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Settings saved');
+
+    vi.advanceTimersByTime(3000);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 });
