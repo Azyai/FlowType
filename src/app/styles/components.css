@@ -144,6 +144,30 @@
   background: #fff0f0;
 }
 
+.content::-webkit-scrollbar,
+nav::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.content::-webkit-scrollbar-track,
+nav::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.72);
+}
+
+.content::-webkit-scrollbar-thumb,
+nav::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(241, 245, 249, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 90, 79, 0.44);
+}
+
+.content::-webkit-scrollbar-thumb:hover,
+nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 90, 79, 0.68);
+}
+
 @media (max-width: 760px) {
   .toast {
     left: 50%;

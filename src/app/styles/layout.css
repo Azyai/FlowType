@@ -15,6 +15,8 @@
 .desktop-frame {
   display: grid;
   grid-template-columns: 264px minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
   color: #1c1f24;
   background: #ffffff;
 }
@@ -23,8 +25,10 @@
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .desktop-titlebar {
@@ -83,13 +87,15 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 40px 24px 28px;
   color: #1c1f24;
   background:
     radial-gradient(circle at 0% 8%, rgba(255, 95, 73, 0.09), transparent 34%),
     linear-gradient(180deg, #f8fbff 0%, #ffffff 38%, #f5f7fb 100%);
   box-shadow: inset -1px 0 0 #edf0f6;
+  overflow: hidden;
 }
 
 .brand {
@@ -128,6 +134,11 @@
 nav {
   display: grid;
   gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(255, 90, 79, 0.4) transparent;
+  scrollbar-width: thin;
 }
 
 .sidebar-footer {
@@ -141,9 +152,14 @@ nav {
 
 .content {
   width: min(100%, 1160px);
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   padding: 18px 36px 48px;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 90, 79, 0.46) rgba(241, 245, 249, 0.76);
+  scrollbar-width: thin;
 }
 
 .content-header {
@@ -169,10 +185,14 @@ nav {
 
   .desktop-frame {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 
   .workspace {
+    height: auto;
     min-height: auto;
+    overflow: visible;
   }
 
   .desktop-titlebar {
@@ -182,11 +202,17 @@ nav {
   }
 
   .sidebar {
+    height: auto;
     min-height: auto;
     padding: 22px 18px;
   }
 
+  nav {
+    overflow: visible;
+  }
+
   .content {
+    height: auto;
     padding: 24px 18px;
     overflow: visible;
   }
