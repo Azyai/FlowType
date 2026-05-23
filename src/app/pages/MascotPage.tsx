@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { AppStateStatus } from '../../types';
 import '../styles/mascot.css';
 
 export function MascotPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
+  const dragMoved = useRef(false);
 
   useEffect(() => {
-    // Force transparent background for the whole window
     document.documentElement.style.setProperty('background', 'transparent', 'important');
     document.body.style.setProperty('background', 'transparent', 'important');
     const root = document.getElementById('root');
@@ -24,16 +26,49 @@ export function MascotPage() {
     };
   }, []);
 
+  const handleMouseDown = async (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    dragMoved.current = false;
+    const startX = e.screenX;
+    const startY = e.screenY;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const dx = Math.abs(moveEvent.screenX - startX);
+      const dy = Math.abs(moveEvent.screenY - startY);
+      if (dx > 5 || dy > 5) {
+        dragMoved.current = true;
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        getCurrentWindow().startDragging().catch(() => {});
+      }
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handleDoubleClick = async () => {
+    if (dragMoved.current) return;
+    try {
+      await invoke('toggle_recording');
+    } catch (err) {
+      console.error('Failed to toggle recording:', err);
+    }
+  };
+
   return (
-    <div 
-      className="mascot-container" 
-      data-tauri-drag-region 
-    >
-      <div className={`mascot-avatar ${status.toLowerCase()}`} data-tauri-drag-region>
-        {status === 'Idle' && <div className="mascot-eyes blink" data-tauri-drag-region></div>}
-        {status === 'Listening' && <div className="mascot-ears listening" data-tauri-drag-region></div>}
-        {status === 'Processing' && <div className="mascot-spinner" data-tauri-drag-region></div>}
-        {status === 'Injecting' && <div className="mascot-sparkles" data-tauri-drag-region></div>}
+    <div className="mascot-container">
+      <div
+        className={`mascot-avatar ${status.toLowerCase()}`}
+        onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
+      >
+        <div className="mascot-eyes blink"></div>
       </div>
     </div>
   );

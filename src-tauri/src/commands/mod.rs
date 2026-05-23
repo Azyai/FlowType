@@ -7,7 +7,7 @@ use crate::{
     desktop::{tray, windows},
 };
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +16,28 @@ pub struct AppStatus {
     pub paused: bool,
     pub current_mode: String,
     pub tray_available: bool,
+}
+
+#[tauri::command]
+pub fn toggle_recording(app: AppHandle) -> CommandResult<()> {
+    let currently_recording = crate::desktop::hotkey::IS_RECORDING.load(std::sync::atomic::Ordering::SeqCst);
+    if currently_recording {
+        crate::desktop::hotkey::IS_RECORDING.store(false, std::sync::atomic::Ordering::SeqCst);
+        let _ = app.emit("status_changed", "Processing");
+        
+        let app_handle_clone = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = app_handle_clone.emit("status_changed", "Injecting");
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let _ = app_handle_clone.emit("status_changed", "Idle");
+        });
+    } else {
+        crate::desktop::hotkey::IS_RECORDING.store(true, std::sync::atomic::Ordering::SeqCst);
+        let _ = app.emit("status_changed", "Listening");
+    }
+    
+    Ok(().into())
 }
 
 #[tauri::command]

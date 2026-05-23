@@ -25,8 +25,8 @@ pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
         .transparent(true)
         .decorations(false)
         .shadow(false)
-        .always_on_top(true)
         .skip_taskbar(true)
+        .always_on_top(true)
         .build()
         .map_err(|error| AppError::Window(error.to_string()))?;
 

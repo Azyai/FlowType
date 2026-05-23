@@ -23,6 +23,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-log = "2"
 rdev = "0.5"
+lazy_static = "1.4"
 thiserror = "2"
 
 [dev-dependencies]

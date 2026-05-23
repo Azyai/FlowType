@@ -9,6 +9,7 @@ mod updates;
 use commands::{
     check_update, get_app_status, get_database_health, get_settings, open_about_window,
     open_settings_window, quit_app, reset_settings, save_settings, set_autostart,
+    toggle_recording,
 };
 use app::AppState;
 use desktop::tray;
@@ -61,7 +62,8 @@ pub fn run() {
             check_update,
             open_settings_window,
             open_about_window,
-            quit_app
+            quit_app,
+            toggle_recording
         ])
         .run(tauri::generate_context!())
         .expect("error while running FlowType");
