@@ -1,0 +1,16 @@
+{
+  "channels": {
+    "stable": {
+      "version": "0.1.1",
+      "notes": "Mock stable release for Phase 0 update checks."
+    },
+    "beta": {
+      "version": "0.2.0-beta.1",
+      "notes": "Mock beta release for update channel testing."
+    },
+    "dev": {
+      "version": "0.2.0-dev.1",
+      "notes": "Mock dev release for update channel testing."
+    }
+  }
+}

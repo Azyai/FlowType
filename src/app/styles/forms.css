@@ -1,0 +1,73 @@
+.field {
+  display: grid;
+  gap: 8px;
+  color: #4f5968;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cad3df;
+  border-radius: 8px;
+  color: #20242c;
+  background: #ffffff;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #344054;
+}
+
+.switch-row input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.check-list {
+  display: grid;
+  gap: 10px;
+  color: #4f5968;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 720px;
+  margin-top: 18px;
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  color: #ffffff;
+  background: #245cdb;
+}
+
+.secondary-button {
+  border: 1px solid #cad3df;
+  color: #2d3748;
+  background: #ffffff;
+}
+
+.secondary-button svg {
+  width: 17px;
+  height: 17px;
+}
