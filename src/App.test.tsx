@@ -9,12 +9,24 @@ import type { AppSettings } from './types';
 const settings: AppSettings = {
   hotkey: 'Alt',
   input_mode: 'hold_to_talk',
-  asr_mode: 'local_first',
-  default_model: 'whisper-small-q8',
-  output_style: 'clean',
+  asr_service_mode: 'built_in',
+  iflytek_app_id: '',
+  iflytek_api_key: '',
+  iflytek_api_secret: '',
+  iflytek_language: 'zh_cn',
+  iflytek_mixed_language: true,
+  iflytek_timeout_ms: 10000,
+  iflytek_retry_count: 1,
+  output_style: 'raw',
   clipboard_restore: 'always',
   floating_window_position: 'bottom_right',
+  show_floating_window: true,
+  floating_window_always_on_top: true,
+  floating_window_animation_enabled: true,
   save_history: true,
+  history_retention_days: 14,
+  vad_enabled: false,
+  hotwords_enabled: false,
   auto_start: false,
   update_channel: 'stable',
   update_manifest_url: 'mock://updates/stable.json',
@@ -36,13 +48,13 @@ describe('FlowType settings shell', () => {
     vi.spyOn(bridge, 'getAppStatus').mockResolvedValue({
       app_version: '0.1.0',
       paused: false,
-      current_mode: 'clean',
+      current_mode: 'raw',
       tray_available: true
     });
     vi.spyOn(bridge, 'getDatabaseHealth').mockResolvedValue({
       ok: true,
       path: 'app.db',
-      applied_migrations: 1,
+      applied_migrations: 2,
       last_error: null
     });
     vi.spyOn(bridge, 'checkUpdate').mockResolvedValue({
@@ -54,6 +66,15 @@ describe('FlowType settings shell', () => {
       manifest_url: 'mock://updates/stable.json'
     });
     vi.spyOn(bridge, 'setAutostart').mockResolvedValue(settings);
+    vi.spyOn(bridge, 'checkAsrService').mockResolvedValue({
+      status: 'ready',
+      provider: 'iflytek',
+      service_mode: 'built_in',
+      message: 'Built-in iFlytek service is configured for the recognition flow.',
+      missing_fields: [],
+      checked_at: '0'
+    });
+    vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
   });
 
   afterEach(() => {
@@ -71,7 +92,7 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument();
     expect(screen.getByText('Version 0.1.0')).toBeInTheDocument();
     expect(screen.getByText('SQLite healthy')).toBeInTheDocument();
-    expect(screen.getByText('Mode: clean')).toBeInTheDocument();
+    expect(screen.getByText('Mode: raw')).toBeInTheDocument();
   });
 
   test('navigates between all Phase 0 settings pages', async () => {
@@ -82,8 +103,9 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
     expect(screen.getByRole('heading', { name: 'Hotkey' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Voice Model' }));
-    expect(screen.getByRole('heading', { name: 'Voice Model' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
+    expect(screen.getByRole('heading', { name: 'ASR Service' })).toBeInTheDocument();
+    expect(screen.queryByText(/Whisper/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Permissions' }));
     expect(screen.getByRole('heading', { name: 'Permissions' })).toBeInTheDocument();
@@ -107,13 +129,51 @@ describe('FlowType settings shell', () => {
 
     await screen.findByRole('heading', { name: 'Status' });
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
-    await user.clear(screen.getByLabelText('Hold-to-talk hotkey'));
-    await user.type(screen.getByLabelText('Hold-to-talk hotkey'), 'Ctrl+Space');
+    await user.click(screen.getByLabelText('Hold-to-talk hotkey'));
+    await user.keyboard('{Control>}{Space}{/Control}');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({ hotkey: 'Ctrl+Space' })
+      );
+    });
+  });
+
+  test('shows iFlytek ASR service status without local model options', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Status' });
+    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
+
+    expect(screen.getByText('Provider: iFlytek')).toBeInTheDocument();
+    expect(screen.getByText('Built-in service account')).toBeInTheDocument();
+    expect(screen.getByText(/audio is uploaded to iFlytek/i)).toBeInTheDocument();
+    expect(screen.queryByText('Local first')).not.toBeInTheDocument();
+    expect(screen.queryByText('Default model')).not.toBeInTheDocument();
+  });
+
+  test('saves custom development iFlytek credentials through settings', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Status' });
+    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
+    await user.selectOptions(screen.getByLabelText('Service mode'), 'custom_dev');
+    await user.type(screen.getByLabelText('iFlytek AppID'), 'test-app-id');
+    await user.type(screen.getByLabelText('iFlytek API Key'), 'test-api-key');
+    await user.type(screen.getByLabelText('iFlytek API Secret'), 'test-api-secret');
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => {
+      expect(bridge.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          asr_service_mode: 'custom_dev',
+          iflytek_app_id: 'test-app-id',
+          iflytek_api_key: 'test-api-key',
+          iflytek_api_secret: 'test-api-secret'
+        })
       );
     });
   });
@@ -127,6 +187,30 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Check update' }));
 
     expect(await screen.findByText('New version 0.1.1 available')).toBeInTheDocument();
+  });
+
+  test('advanced settings include output mode and history controls', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Status' });
+    await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
+    await user.selectOptions(screen.getByLabelText('History retention'), '30');
+    await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
+    await user.click(screen.getByRole('button', { name: 'Clear history' }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => {
+      expect(bridge.clearHistory).toHaveBeenCalled();
+      expect(bridge.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          output_style: 'formal',
+          history_retention_days: 30,
+          show_floating_window: false
+        })
+      );
+    });
   });
 
   test('toggles autostart through the native bridge', async () => {

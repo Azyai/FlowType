@@ -65,7 +65,12 @@ export default function App() {
                 <HotkeyPage settings={settings} setSettings={shell.setSettings} />
               )}
               {activePage === 'voice' && (
-                <VoicePage settings={settings} setSettings={shell.setSettings} />
+                <VoicePage
+                  settings={settings}
+                  setSettings={shell.setSettings}
+                  asrResult={shell.asrResult}
+                  onCheckAsrService={shell.handleCheckAsrService}
+                />
               )}
               {activePage === 'permissions' && <PermissionsPage />}
               {activePage === 'output' && (
@@ -78,6 +83,7 @@ export default function App() {
                   updateResult={shell.updateResult}
                   onCheckUpdate={shell.handleCheckUpdate}
                   onAutostart={shell.handleAutostart}
+                  onClearHistory={shell.handleClearHistory}
                 />
               )}
               {activePage === 'history' && <HistoryPage settings={settings} />}

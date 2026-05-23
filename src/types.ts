@@ -1,5 +1,7 @@
 export type InputMode = 'hold_to_talk' | 'toggle';
-export type AsrMode = 'local_first' | 'cloud_first' | 'cloud_only';
+export type AsrServiceMode = 'built_in' | 'custom_dev';
+export type IflytekLanguage = 'zh_cn' | 'en_us' | 'zh_en';
+export type HistoryRetentionDays = 7 | 14 | 30;
 export type OutputStyle = 'raw' | 'clean' | 'formal';
 export type ClipboardRestore = 'always' | 'delayed' | 'never' | 'text_only';
 export type FloatingWindowPosition = 'bottom_right' | 'cursor_nearby';
@@ -11,12 +13,24 @@ export type AppStateStatus = 'Idle' | 'Listening' | 'Processing' | 'Injecting';
 export interface AppSettings {
   hotkey: string;
   input_mode: InputMode;
-  asr_mode: AsrMode;
-  default_model: string;
+  asr_service_mode: AsrServiceMode;
+  iflytek_app_id: string;
+  iflytek_api_key: string;
+  iflytek_api_secret: string;
+  iflytek_language: IflytekLanguage;
+  iflytek_mixed_language: boolean;
+  iflytek_timeout_ms: number;
+  iflytek_retry_count: number;
   output_style: OutputStyle;
   clipboard_restore: ClipboardRestore;
   floating_window_position: FloatingWindowPosition;
+  show_floating_window: boolean;
+  floating_window_always_on_top: boolean;
+  floating_window_animation_enabled: boolean;
   save_history: boolean;
+  history_retention_days: HistoryRetentionDays;
+  vad_enabled: boolean;
+  hotwords_enabled: boolean;
   auto_start: boolean;
   update_channel: UpdateChannel;
   update_manifest_url: string;
@@ -47,6 +61,33 @@ export interface UpdateCheckResult {
   channel: UpdateChannel;
   notes: string | null;
   manifest_url: string;
+}
+
+export type AsrServiceStatus = 'ready' | 'missing_config';
+
+export interface AsrServiceConfig {
+  provider: 'iflytek';
+  service_mode: AsrServiceMode;
+  iflytek_app_id_masked: string;
+  iflytek_api_key_masked: string;
+  iflytek_api_secret_configured: boolean;
+  language: IflytekLanguage;
+  mixed_language: boolean;
+  timeout_ms: number;
+  retry_count: number;
+}
+
+export interface AsrServiceCheckResult {
+  status: AsrServiceStatus;
+  provider: 'iflytek';
+  service_mode: AsrServiceMode;
+  message: string;
+  missing_fields: string[];
+  checked_at: string;
+}
+
+export interface ClearHistoryResult {
+  deleted_count: number;
 }
 
 export interface NativeErrorShape {

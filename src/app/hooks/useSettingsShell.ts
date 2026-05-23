@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { PageId, pageTitleKey } from '../config/navigation';
 import {
+  checkAsrService,
   checkUpdate,
+  clearHistory,
   getAppStatus,
   getDatabaseHealth,
   getSettings,
@@ -13,7 +15,7 @@ import {
 import { readableError } from '../../lib/formatters/errors';
 import { resolveLocale } from '../../lib/i18n/locale';
 import { translate } from '../../lib/i18n/I18nContext';
-import type { AppSettings, AppStatus, DatabaseHealth, UpdateCheckResult } from '../../types';
+import type { AppSettings, AppStatus, AsrServiceCheckResult, DatabaseHealth, UpdateCheckResult } from '../../types';
 
 export interface ToastState {
   kind: 'success' | 'error';
@@ -26,6 +28,7 @@ export function useSettingsShell() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [databaseHealth, setDatabaseHealth] = useState<DatabaseHealth | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
+  const [asrResult, setAsrResult] = useState<AsrServiceCheckResult | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
@@ -126,12 +129,34 @@ export function useSettingsShell() {
     }
   }
 
+  async function handleCheckAsrService() {
+    try {
+      const result = await checkAsrService();
+      setAsrResult(result);
+      showToast('success', t('notice.asrChecked'));
+    } catch (asrError) {
+      showToast('error', readableError(asrError));
+    }
+  }
+
+  async function handleClearHistory() {
+    try {
+      const result = await clearHistory();
+      showToast('success', t('notice.historyCleared', { count: result.deleted_count }));
+    } catch (historyError) {
+      showToast('error', readableError(historyError));
+    }
+  }
+
   return {
     activePage,
     activeTitle,
+    asrResult,
     databaseHealth,
     handleAutostart,
+    handleCheckAsrService,
     handleCheckUpdate,
+    handleClearHistory,
     handleReset,
     handleSave,
     locale,

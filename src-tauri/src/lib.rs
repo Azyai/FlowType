@@ -1,4 +1,5 @@
 mod app;
+mod asr;
 mod commands;
 mod desktop;
 mod error;
@@ -6,12 +7,12 @@ mod settings;
 mod storage;
 mod updates;
 
-use commands::{
-    check_update, get_app_status, get_database_health, get_settings, open_about_window,
-    open_settings_window, quit_app, reset_settings, save_settings, set_autostart,
-    toggle_recording,
-};
 use app::AppState;
+use commands::{
+    check_asr_service, check_update, clear_history, get_app_status, get_asr_service_config,
+    get_database_health, get_settings, open_about_window, open_settings_window, quit_app,
+    reset_settings, save_asr_service_config, save_settings, set_autostart, toggle_recording,
+};
 use desktop::tray;
 use settings::ConfigStore;
 use storage::Database;
@@ -56,9 +57,13 @@ pub fn run() {
             get_settings,
             save_settings,
             reset_settings,
+            get_asr_service_config,
+            save_asr_service_config,
+            check_asr_service,
             get_app_status,
             set_autostart,
             get_database_health,
+            clear_history,
             check_update,
             open_settings_window,
             open_about_window,

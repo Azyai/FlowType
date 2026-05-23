@@ -1,4 +1,4 @@
-import type { AppSettings, UpdateCheckResult } from '../../types';
+import type { AppSettings, HistoryRetentionDays, UpdateCheckResult } from '../../types';
 import { updateMessage } from '../../lib/formatters/updateMessage';
 import { useI18n } from '../../lib/i18n/I18nContext';
 
@@ -7,18 +7,35 @@ export function AdvancedPage({
   setSettings,
   updateResult,
   onCheckUpdate,
-  onAutostart
+  onAutostart,
+  onClearHistory
 }: {
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
   updateResult: UpdateCheckResult | null;
   onCheckUpdate: () => void;
   onAutostart: (enabled: boolean) => void;
+  onClearHistory: () => void;
 }) {
   const { t } = useI18n();
 
   return (
     <section className="panel">
+      <label className="field">
+        <span>{t('output.style')}</span>
+        <select
+          value={settings.output_style}
+          aria-label={t('output.style')}
+          onChange={(event) =>
+            setSettings({ ...settings, output_style: event.target.value as AppSettings['output_style'] })
+          }
+        >
+          <option value="raw">{t('output.raw')}</option>
+          <option value="clean">{t('output.clean')}</option>
+          <option value="formal">{t('output.formal')}</option>
+        </select>
+      </label>
+
       <label className="switch-row">
         <input
           type="checkbox"
@@ -36,6 +53,74 @@ export function AdvancedPage({
         />
         <span>{t('advanced.keepHistory')}</span>
       </label>
+      <label className="field">
+        <span>{t('advanced.historyRetention')}</span>
+        <select
+          value={settings.history_retention_days}
+          aria-label={t('advanced.historyRetention')}
+          onChange={(event) =>
+            setSettings({
+              ...settings,
+              history_retention_days: Number(event.target.value) as HistoryRetentionDays
+            })
+          }
+        >
+          {[7, 14, 30].map((days) => (
+            <option key={days} value={days}>
+              {t('advanced.retentionDays', { days })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" className="secondary-button" onClick={onClearHistory}>
+        {t('advanced.clearHistory')}
+      </button>
+
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={settings.show_floating_window}
+          onChange={(event) => setSettings({ ...settings, show_floating_window: event.target.checked })}
+        />
+        <span>{t('advanced.showFloatingWindow')}</span>
+      </label>
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={settings.floating_window_always_on_top}
+          onChange={(event) =>
+            setSettings({ ...settings, floating_window_always_on_top: event.target.checked })
+          }
+        />
+        <span>{t('advanced.floatingAlwaysOnTop')}</span>
+      </label>
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={settings.floating_window_animation_enabled}
+          onChange={(event) =>
+            setSettings({ ...settings, floating_window_animation_enabled: event.target.checked })
+          }
+        />
+        <span>{t('advanced.floatingAnimation')}</span>
+      </label>
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={settings.vad_enabled}
+          onChange={(event) => setSettings({ ...settings, vad_enabled: event.target.checked })}
+        />
+        <span>{t('advanced.vad')}</span>
+      </label>
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={settings.hotwords_enabled}
+          onChange={(event) => setSettings({ ...settings, hotwords_enabled: event.target.checked })}
+        />
+        <span>{t('advanced.hotwords')}</span>
+      </label>
+
       <label className="field">
         <span>{t('advanced.displayLanguage')}</span>
         <select

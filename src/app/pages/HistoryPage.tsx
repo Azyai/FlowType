@@ -8,8 +8,9 @@ export function HistoryPage({ settings }: { settings: AppSettings }) {
   return (
     <section className="panel">
       <p className="muted">
-        {t('history.storage', { status })} {t('history.futureTables')}
+        {t('history.storage', { status })} {t('history.retention', { days: settings.history_retention_days })}
       </p>
+      <p className="muted">{t('history.textOnly')}</p>
     </section>
   );
 }

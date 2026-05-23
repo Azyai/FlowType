@@ -1,4 +1,5 @@
 use crate::{
+    asr::{self, AsrServiceCheckResult, AsrServiceConfig},
     settings::{AppSettings, OutputStyle},
     storage::DatabaseHealth,
     error::{AppError, AppResult, CommandResult, ErrorResponse},
@@ -6,7 +7,7 @@ use crate::{
     updates::{self, UpdateCheckResult},
     desktop::{tray, windows},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State, Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 
@@ -16,6 +17,23 @@ pub struct AppStatus {
     pub paused: bool,
     pub current_mode: String,
     pub tray_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ClearHistoryResult {
+    pub deleted_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AsrServiceConfigInput {
+    pub asr_service_mode: crate::settings::AsrServiceMode,
+    pub iflytek_app_id: String,
+    pub iflytek_api_key: String,
+    pub iflytek_api_secret: String,
+    pub iflytek_language: crate::settings::IflytekLanguage,
+    pub iflytek_mixed_language: bool,
+    pub iflytek_timeout_ms: u64,
+    pub iflytek_retry_count: u8,
 }
 
 #[tauri::command]
@@ -84,6 +102,30 @@ pub fn check_update(state: State<AppState>) -> CommandResult<UpdateCheckResult> 
 }
 
 #[tauri::command]
+pub fn get_asr_service_config(state: State<AppState>) -> CommandResult<AsrServiceConfig> {
+    into_command(state.settings().map(|settings| asr::service_config(&settings)))
+}
+
+#[tauri::command]
+pub fn save_asr_service_config(
+    app: AppHandle,
+    state: State<AppState>,
+    config: AsrServiceConfigInput,
+) -> CommandResult<AppSettings> {
+    into_command(save_asr_config_and_refresh_tray(&app, &state, config))
+}
+
+#[tauri::command]
+pub fn check_asr_service(state: State<AppState>) -> CommandResult<AsrServiceCheckResult> {
+    into_command(state.settings().map(|settings| asr::check_service(&settings)))
+}
+
+#[tauri::command]
+pub fn clear_history(state: State<AppState>) -> CommandResult<ClearHistoryResult> {
+    into_command(state.clear_history().map(|deleted_count| ClearHistoryResult { deleted_count }))
+}
+
+#[tauri::command]
 pub async fn open_settings_window(app: AppHandle) -> CommandResult<()> {
     into_command(windows::show_main_window(&app))
 }
@@ -121,6 +163,23 @@ fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResu
         log::warn!("failed to refresh tray after resetting settings: {error:?}");
     }
     Ok(saved)
+}
+
+fn save_asr_config_and_refresh_tray(
+    app: &AppHandle,
+    state: &AppState,
+    config: AsrServiceConfigInput,
+) -> AppResult<AppSettings> {
+    let mut settings = state.settings()?;
+    settings.asr_service_mode = config.asr_service_mode;
+    settings.iflytek_app_id = config.iflytek_app_id;
+    settings.iflytek_api_key = config.iflytek_api_key;
+    settings.iflytek_api_secret = config.iflytek_api_secret;
+    settings.iflytek_language = config.iflytek_language;
+    settings.iflytek_mixed_language = config.iflytek_mixed_language;
+    settings.iflytek_timeout_ms = config.iflytek_timeout_ms;
+    settings.iflytek_retry_count = config.iflytek_retry_count;
+    save_settings_and_refresh_tray(app, state, settings)
 }
 
 pub fn app_status(state: &AppState) -> AppResult<AppStatus> {

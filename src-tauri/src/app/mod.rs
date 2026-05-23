@@ -50,6 +50,10 @@ impl AppState {
         self.database.health()
     }
 
+    pub fn clear_history(&self) -> AppResult<usize> {
+        self.database.clear_transcript_history()
+    }
+
     pub fn toggle_paused(&self) -> bool {
         let current = self.paused.load(Ordering::Relaxed);
         self.paused.store(!current, Ordering::Relaxed);

@@ -52,7 +52,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         })
         .unwrap_or_else(|| {
             let labels = tray_labels(&crate::settings::LocalePreference::Auto);
-            (labels, false, OutputStyle::Clean)
+            (labels, false, OutputStyle::Raw)
         });
 
     let pause_label = if paused {

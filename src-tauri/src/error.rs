@@ -19,8 +19,14 @@ pub enum AppError {
     Window(String),
     #[error("startup launch operation failed")]
     Autostart(String),
-    #[error("update check failed")]
+    #[error("update check failed: {0}")]
     Update(String),
+    #[error("ASR service configuration is missing or incomplete")]
+    AsrConfigMissing(String),
+    #[error("ASR service is unavailable")]
+    AsrServiceUnavailable(String),
+    #[error("history storage operation failed")]
+    HistoryStorage(String),
     #[error("internal state lock failed")]
     StateLock,
 }
@@ -34,6 +40,9 @@ impl From<AppError> for ErrorResponse {
             AppError::Window(_) => "WINDOW",
             AppError::Autostart(_) => "AUTOSTART",
             AppError::Update(_) => "UPDATE",
+            AppError::AsrConfigMissing(_) => "ASR_CONFIG_MISSING",
+            AppError::AsrServiceUnavailable(_) => "ASR_SERVICE_UNAVAILABLE",
+            AppError::HistoryStorage(_) => "HISTORY_STORAGE",
             AppError::StateLock => "STATE_LOCK",
         };
 

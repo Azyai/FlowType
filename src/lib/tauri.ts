@@ -1,7 +1,21 @@
 import { invoke } from '@tauri-apps/api/core';
 
-import { defaultSettings, fallbackDatabaseHealth, fallbackStatus } from './defaults';
-import type { AppSettings, AppStatus, DatabaseHealth, UpdateCheckResult } from '../types';
+import {
+  defaultSettings,
+  fallbackAsrServiceCheck,
+  fallbackAsrServiceConfig,
+  fallbackDatabaseHealth,
+  fallbackStatus
+} from './defaults';
+import type {
+  AppSettings,
+  AppStatus,
+  AsrServiceCheckResult,
+  AsrServiceConfig,
+  ClearHistoryResult,
+  DatabaseHealth,
+  UpdateCheckResult
+} from '../types';
 
 const isTauriRuntime = () => Boolean('__TAURI_INTERNALS__' in window);
 
@@ -49,6 +63,32 @@ export function checkUpdate(): Promise<UpdateCheckResult> {
     notes: null,
     manifest_url: defaultSettings.update_manifest_url
   });
+}
+
+export function getAsrServiceConfig(): Promise<AsrServiceConfig> {
+  return nativeInvoke('get_asr_service_config', undefined, fallbackAsrServiceConfig);
+}
+
+export function saveAsrServiceConfig(config: Pick<
+  AppSettings,
+  | 'asr_service_mode'
+  | 'iflytek_app_id'
+  | 'iflytek_api_key'
+  | 'iflytek_api_secret'
+  | 'iflytek_language'
+  | 'iflytek_mixed_language'
+  | 'iflytek_timeout_ms'
+  | 'iflytek_retry_count'
+>): Promise<AppSettings> {
+  return nativeInvoke('save_asr_service_config', { config }, { ...defaultSettings, ...config });
+}
+
+export function checkAsrService(): Promise<AsrServiceCheckResult> {
+  return nativeInvoke('check_asr_service', undefined, fallbackAsrServiceCheck);
+}
+
+export function clearHistory(): Promise<ClearHistoryResult> {
+  return nativeInvoke('clear_history', undefined, { deleted_count: 0 });
 }
 
 export function openSettingsWindow(): Promise<void> {
