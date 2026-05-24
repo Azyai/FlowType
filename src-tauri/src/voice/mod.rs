@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod iflytek;
 pub mod inject;
+pub mod output;
 pub mod state;
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
     storage::NewTranscriptHistory,
     voice::{
         audio::{AudioRecorder, RecordedAudio},
+        output::transform_output_text,
         state::{StopDecision, VoiceSessionEvent, VoiceStateMachine, VoiceStatus, VoiceTrigger},
     },
 };
@@ -151,8 +153,8 @@ impl VoiceController {
             });
             let recognition_duration_ms = elapsed_millis_i64(recognition_started);
 
-            let recognized = match recognition {
-                Ok(result) if !result.text.trim().is_empty() => result.text,
+            let raw_text = match recognition {
+                Ok(result) if !result.text.trim().is_empty() => result.text.trim().to_string(),
                 Ok(_) => {
                     let message = "No speech text was recognized.".to_string();
                     record_history_if_enabled(
@@ -186,22 +188,23 @@ impl VoiceController {
                     return;
                 }
             };
+            let final_text = transformed_output_text(&raw_text, &settings.output_style);
 
             let _ = state.transition_voice(&app, VoiceStatus::Injecting);
-            match inject::inject_text(&recognized, &settings.clipboard_restore) {
+            match inject::inject_text(&final_text, &settings.clipboard_restore) {
                 Ok(outcome) => {
                     record_history_if_enabled(
                         &state,
                         &settings,
-                        &recognized,
-                        &recognized,
+                        &raw_text,
+                        &final_text,
                         &recognition_started_at,
                         recognition_duration_ms,
                         matches!(outcome, inject::InjectionOutcome::Pasted),
                         None,
                         None,
                     );
-                    state.emit_voice_event(&app, VoiceSessionEvent::final_text(recognized));
+                    state.emit_voice_event(&app, VoiceSessionEvent::final_text(final_text));
                     let _ = state.transition_voice(&app, VoiceStatus::Success);
                 }
                 Err(error) => {
@@ -209,8 +212,8 @@ impl VoiceController {
                     record_history_if_enabled(
                         &state,
                         &settings,
-                        &recognized,
-                        &recognized,
+                        &raw_text,
+                        &final_text,
                         &recognition_started_at,
                         recognition_duration_ms,
                         false,
@@ -221,6 +224,15 @@ impl VoiceController {
                 }
             }
         });
+    }
+}
+
+fn transformed_output_text(raw_text: &str, output_style: &OutputStyle) -> String {
+    let transformed = transform_output_text(raw_text, output_style);
+    if transformed.is_empty() {
+        raw_text.to_string()
+    } else {
+        transformed
     }
 }
 

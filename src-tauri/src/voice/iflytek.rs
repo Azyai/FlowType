@@ -9,8 +9,11 @@ use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::Sha256;
-use std::time::SystemTime;
-use tungstenite::{connect, Message};
+use std::{
+    net::TcpStream,
+    time::{Duration, SystemTime},
+};
+use tungstenite::{connect, stream::MaybeTlsStream, Message};
 
 const IFLYTEK_HOST: &str = "iat-api.xfyun.cn";
 const IFLYTEK_PATH: &str = "/v2/iat";
@@ -28,13 +31,22 @@ pub fn recognize_blocking(
     audio: RecordedAudio,
     mut on_partial: impl FnMut(String),
 ) -> AppResult<RecognitionResult> {
+    retry_asr_service(settings.iflytek_retry_count, || recognize_once(settings, &audio, &mut on_partial))
+}
+
+fn recognize_once(
+    settings: &AppSettings,
+    audio: &RecordedAudio,
+    mut on_partial: impl FnMut(String),
+) -> AppResult<RecognitionResult> {
     let credentials = credentials_for(settings)
         .ok_or_else(|| AppError::AsrConfigMissing("iFlytek credentials are incomplete".to_string()))?;
     let auth_url = build_auth_url(&credentials, SystemTime::now())?;
     let (mut socket, _) = connect(auth_url.as_str())
         .map_err(|error| AppError::AsrServiceUnavailable(error.to_string()))?;
+    configure_socket_timeout(socket.get_mut(), request_timeout(settings))?;
 
-    let audio = resample_to_16khz(&audio);
+    let audio = resample_to_16khz(audio);
     let frames = audio_frames(&audio.pcm, 1280);
     let mut final_text = String::new();
 
@@ -70,6 +82,59 @@ pub fn recognize_blocking(
 
     let _ = socket.close(None);
     Ok(RecognitionResult { text: final_text })
+}
+
+fn retry_asr_service<T, F>(retry_count: u8, mut operation: F) -> AppResult<T>
+where
+    F: FnMut() -> AppResult<T>,
+{
+    let max_attempts = usize::from(retry_count).saturating_add(1);
+    let mut last_error = None;
+
+    for attempt_index in 0..max_attempts {
+        match operation() {
+            Ok(result) => return Ok(result),
+            Err(AppError::AsrServiceUnavailable(message)) => {
+                let error = AppError::AsrServiceUnavailable(message);
+                let attempt_number = attempt_index + 1;
+                if attempt_number >= max_attempts {
+                    return Err(error);
+                }
+
+                log::warn!(
+                    "iFlytek recognition attempt {attempt_number}/{max_attempts} failed, retrying: {error}"
+                );
+                last_error = Some(error);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        AppError::AsrServiceUnavailable("iFlytek recognition failed without a retryable error".to_string())
+    }))
+}
+
+fn request_timeout(settings: &AppSettings) -> Duration {
+    Duration::from_millis(settings.iflytek_timeout_ms.max(1_000))
+}
+
+fn configure_socket_timeout(stream: &mut MaybeTlsStream<TcpStream>, timeout: Duration) -> AppResult<()> {
+    match stream {
+        MaybeTlsStream::Plain(socket) => configure_tcp_stream_timeout(socket, timeout),
+        MaybeTlsStream::NativeTls(socket) => configure_tcp_stream_timeout(socket.get_mut(), timeout),
+        _ => Ok(()),
+    }
+}
+
+fn configure_tcp_stream_timeout(stream: &mut TcpStream, timeout: Duration) -> AppResult<()> {
+    stream
+        .set_read_timeout(Some(timeout))
+        .map_err(|error| AppError::AsrServiceUnavailable(error.to_string()))?;
+    stream
+        .set_write_timeout(Some(timeout))
+        .map_err(|error| AppError::AsrServiceUnavailable(error.to_string()))?;
+    Ok(())
 }
 
 pub fn build_auth_url(credentials: &IflytekCredentials, time: SystemTime) -> AppResult<String> {
@@ -200,6 +265,7 @@ fn parse_response(raw: &str) -> AppResult<ParsedResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::AppError;
 
     #[test]
     fn auth_url_contains_required_query_parts_without_plain_secret() {
@@ -247,5 +313,52 @@ mod tests {
         let error = parse_response(raw).unwrap_err();
 
         assert!(error.to_string().contains("auth failed"));
+    }
+
+    #[test]
+    fn retries_service_unavailable_errors_until_success() {
+        let mut attempts = 0;
+
+        let result = retry_asr_service(2, || {
+            attempts += 1;
+            if attempts < 3 {
+                Err(AppError::AsrServiceUnavailable("temporary".to_string()))
+            } else {
+                Ok("done")
+            }
+        })
+        .unwrap();
+
+        assert_eq!(result, "done");
+        assert_eq!(attempts, 3);
+    }
+
+    #[test]
+    fn does_not_retry_non_service_errors() {
+        let mut attempts = 0;
+
+        let error = retry_asr_service(3, || {
+            attempts += 1;
+            Err::<(), AppError>(AppError::AsrConfigMissing("missing".to_string()))
+        })
+        .unwrap_err();
+
+        assert!(matches!(error, AppError::AsrConfigMissing(_)));
+        assert_eq!(attempts, 1);
+    }
+
+    #[test]
+    fn returns_last_retryable_error_after_retries_are_exhausted() {
+        let mut attempts = 0;
+
+        let error = retry_asr_service(1, || {
+            attempts += 1;
+            Err::<(), AppError>(AppError::AsrServiceUnavailable(format!("temporary-{attempts}")))
+        })
+        .unwrap_err();
+
+        assert!(matches!(error, AppError::AsrServiceUnavailable(_)));
+        assert_eq!(attempts, 2);
+        assert!(error.to_string().contains("temporary-2"));
     }
 }
