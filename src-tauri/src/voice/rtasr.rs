@@ -150,6 +150,7 @@ fn start_session_socket(settings: &AppSettings) -> AppResult<WebSocket<MaybeTlsS
     let auth_url = build_auth_url(&credentials, settings, SystemTime::now())?;
     let mut socket = connect_websocket(&auth_url, timeout)?;
     await_started(&mut socket)?;
+    configure_socket_streaming_timeout(socket.get_mut(), timeout)?;
     Ok(socket)
 }
 
@@ -308,7 +309,7 @@ fn connect_websocket(
             "The RTASR websocket handshake was interrupted before completion.".to_string(),
         ),
     })?;
-    configure_socket_timeout(socket.get_mut(), timeout)?;
+    configure_socket_startup_timeout(socket.get_mut(), timeout)?;
     Ok(socket)
 }
 
@@ -367,22 +368,48 @@ fn connect_tcp_stream(host: &str, port: u16, timeout: Duration) -> AppResult<Tcp
     ))
 }
 
-fn configure_socket_timeout(stream: &mut MaybeTlsStream<TcpStream>, timeout: Duration) -> AppResult<()> {
+fn configure_socket_startup_timeout(stream: &mut MaybeTlsStream<TcpStream>, timeout: Duration) -> AppResult<()> {
+    configure_socket_timeout(stream, startup_read_timeout(timeout), timeout)
+}
+
+fn configure_socket_streaming_timeout(stream: &mut MaybeTlsStream<TcpStream>, timeout: Duration) -> AppResult<()> {
+    configure_socket_timeout(stream, streaming_read_timeout(timeout), timeout)
+}
+
+fn configure_socket_timeout(
+    stream: &mut MaybeTlsStream<TcpStream>,
+    read_timeout: Duration,
+    write_timeout: Duration,
+) -> AppResult<()> {
     match stream {
-        MaybeTlsStream::Plain(socket) => configure_tcp_stream_timeout(socket, timeout),
-        MaybeTlsStream::NativeTls(socket) => configure_tcp_stream_timeout(socket.get_mut(), timeout),
+        MaybeTlsStream::Plain(socket) => configure_tcp_stream_timeout(socket, read_timeout, write_timeout),
+        MaybeTlsStream::NativeTls(socket) => {
+            configure_tcp_stream_timeout(socket.get_mut(), read_timeout, write_timeout)
+        }
         _ => Ok(()),
     }
 }
 
-fn configure_tcp_stream_timeout(stream: &mut TcpStream, timeout: Duration) -> AppResult<()> {
+fn configure_tcp_stream_timeout(
+    stream: &mut TcpStream,
+    read_timeout: Duration,
+    write_timeout: Duration,
+) -> AppResult<()> {
     stream
-        .set_read_timeout(Some(READ_POLL_INTERVAL.min(timeout)))
+        .set_read_timeout(Some(read_timeout))
         .map_err(map_io_error_to_asr)?;
     stream
-        .set_write_timeout(Some(timeout))
+        .set_write_timeout(Some(write_timeout))
         .map_err(map_io_error_to_asr)?;
     Ok(())
+}
+
+fn startup_read_timeout(timeout: Duration) -> Duration {
+    timeout.max(READ_POLL_INTERVAL)
+}
+
+fn streaming_read_timeout(timeout: Duration) -> Duration {
+    READ_POLL_INTERVAL.min(timeout)
 }
 
 fn map_io_error_to_asr(error: std::io::Error) -> AppError {
@@ -796,6 +823,20 @@ mod tests {
         settings.rtasr_timeout_ms = 1_000;
 
         assert_eq!(request_timeout(&settings), Duration::from_millis(5_000));
+    }
+
+    #[test]
+    fn startup_read_timeout_uses_full_request_timeout() {
+        let timeout = Duration::from_secs(8);
+
+        assert_eq!(startup_read_timeout(timeout), timeout);
+    }
+
+    #[test]
+    fn streaming_read_timeout_keeps_short_polling_interval() {
+        let timeout = Duration::from_secs(8);
+
+        assert_eq!(streaming_read_timeout(timeout), READ_POLL_INTERVAL);
     }
 
     #[test]
