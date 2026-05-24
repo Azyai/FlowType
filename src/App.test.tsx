@@ -6,6 +6,8 @@ import App from './App';
 import * as bridge from './lib/tauri';
 import type { AppSettings } from './types';
 
+const writeText = vi.fn().mockResolvedValue(undefined);
+
 const settings: AppSettings = {
   hotkey: 'Ctrl+Alt+V',
   input_mode: 'hold_to_talk',
@@ -42,6 +44,10 @@ describe('FlowType settings shell', () => {
       value: 'en-US',
       configurable: true
     });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true
+    });
     vi.spyOn(bridge, 'getSettings').mockResolvedValue(settings);
     vi.spyOn(bridge, 'saveSettings').mockResolvedValue(settings);
     vi.spyOn(bridge, 'getAppStatus').mockResolvedValue({
@@ -73,12 +79,13 @@ describe('FlowType settings shell', () => {
       checked_at: '0'
     });
     vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
+    vi.spyOn(bridge, 'deleteHistoryItem').mockResolvedValue({ deleted_count: 1 });
     vi.spyOn(bridge, 'getHistory').mockResolvedValue({
       items: [
         {
           id: 1,
           raw_text: 'raw transcript',
-          final_text: 'final transcript',
+          final_text: 'this is a long final transcript that should be truncated in history view',
           output_style: 'raw',
           recognition_started_at: 1700000000,
           recognition_duration_ms: 820,
@@ -101,6 +108,7 @@ describe('FlowType settings shell', () => {
       configurable: true
     });
     vi.restoreAllMocks();
+    writeText.mockClear();
   });
 
   test('renders the hotkey page after loading native state', async () => {
@@ -189,20 +197,53 @@ describe('FlowType settings shell', () => {
     });
   });
 
-  test('renders transcript history from the native bridge and clears it on demand', async () => {
+  test('renders compact transcript history items and supports copy/delete actions', async () => {
     const user = userEvent.setup();
+    vi.mocked(bridge.getHistory)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 1,
+            raw_text: 'raw transcript',
+            final_text: 'this is a long final transcript that should be truncated in history view',
+            output_style: 'raw',
+            recognition_started_at: 1700000000,
+            recognition_duration_ms: 820,
+            injected: true,
+            error_code: null,
+            error_summary: null,
+            created_at: 1700000000
+          }
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0
+      })
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        limit: 20,
+        offset: 0
+      });
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'History' }));
 
-    expect(await screen.findByText('final transcript')).toBeInTheDocument();
-    expect(screen.getByText('raw transcript')).toBeInTheDocument();
+    expect(
+      await screen.findByText('this is a long final transcript...')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Clear history' }));
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith(
+      'this is a long final transcript that should be truncated in history view'
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
-      expect(bridge.clearHistory).toHaveBeenCalled();
+      expect(bridge.deleteHistoryItem).toHaveBeenCalledWith(1);
       expect(bridge.getHistory).toHaveBeenCalledTimes(2);
     });
   });

@@ -1,11 +1,17 @@
+import { Copy, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { readableError } from '../../lib/formatters/errors';
 import { useI18n } from '../../lib/i18n/I18nContext';
-import { getHistory } from '../../lib/tauri';
-import type { AppSettings, TranscriptHistoryPage as TranscriptHistoryPageResult } from '../../types';
+import { deleteHistoryItem, getHistory } from '../../lib/tauri';
+import type {
+  AppSettings,
+  TranscriptHistoryItem,
+  TranscriptHistoryPage as TranscriptHistoryPageResult
+} from '../../types';
 
 const PAGE_SIZE = 20;
+const HISTORY_PREVIEW_LENGTH = 30;
 
 export function HistoryPage({
   settings,
@@ -24,7 +30,9 @@ export function HistoryPage({
   });
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
   const loadHistory = useCallback(async (offset = 0, append = false) => {
     setLoading(true);
@@ -53,6 +61,7 @@ export function HistoryPage({
 
   async function handleClearHistory() {
     setClearing(true);
+    setFeedback(null);
     try {
       await onClearHistory();
       await loadHistory();
@@ -74,6 +83,38 @@ export function HistoryPage({
     }
 
     return `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)} s`;
+  }
+
+  async function handleCopyHistoryItem(item: TranscriptHistoryItem) {
+    setFeedback(null);
+
+    try {
+      await navigator.clipboard.writeText(historyItemText(item));
+      setFeedback({ kind: 'success', message: t('notice.historyItemCopied') });
+    } catch (copyError) {
+      setFeedback({ kind: 'error', message: readableError(copyError) });
+    }
+  }
+
+  async function handleDeleteHistoryItem(id: number) {
+    setDeletingId(id);
+    setFeedback(null);
+
+    try {
+      const result = await deleteHistoryItem(id);
+      if (result.deleted_count > 0) {
+        const nextOffset =
+          historyPage.offset > 0 && historyPage.items.length === result.deleted_count
+            ? Math.max(0, historyPage.offset - PAGE_SIZE)
+            : historyPage.offset;
+        await loadHistory(nextOffset);
+        setFeedback({ kind: 'success', message: t('notice.historyItemDeleted') });
+      }
+    } catch (deleteError) {
+      setFeedback({ kind: 'error', message: readableError(deleteError) });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const canLoadMore = historyPage.items.length < historyPage.total;
@@ -114,6 +155,15 @@ export function HistoryPage({
         </div>
       )}
 
+      {feedback && (
+        <div
+          className={`inline-result${feedback.kind === 'error' ? ' danger' : ''}`}
+          role={feedback.kind === 'error' ? 'alert' : 'status'}
+        >
+          {feedback.message}
+        </div>
+      )}
+
       {loading && historyPage.items.length === 0 ? (
         <p className="muted">{t('history.loading')}</p>
       ) : historyPage.items.length === 0 ? (
@@ -124,8 +174,8 @@ export function HistoryPage({
       ) : (
         <div className="history-list">
           {historyPage.items.map((item) => {
-            const finalText = item.final_text.trim();
-            const rawText = item.raw_text.trim();
+            const itemText = historyItemText(item);
+            const previewText = truncateHistoryText(itemText);
             const isFailed = Boolean(item.error_code);
             const deliveryLabel = isFailed
               ? t('history.failed')
@@ -138,23 +188,35 @@ export function HistoryPage({
                 <div className="history-item-header">
                   <div className="history-item-meta">
                     <strong>{deliveryLabel}</strong>
-                    <span>{t('history.duration')}: {formatDuration(item.recognition_duration_ms)}</span>
                     <span>{t('history.createdAt')}: {formatDate(item.created_at)}</span>
+                    <span>{t('history.duration')}: {formatDuration(item.recognition_duration_ms)}</span>
                   </div>
                   <span className={`history-chip${isFailed ? ' danger' : ''}`}>
                     {item.error_code ?? item.output_style}
                   </span>
                 </div>
 
-                <div className="history-item-body">
-                  <div className="history-copy-block">
-                    <strong>{t('history.finalText')}</strong>
-                    <p>{finalText || rawText || '-'}</p>
-                  </div>
-
-                  <div className="history-copy-block">
-                    <strong>{t('history.rawText')}</strong>
-                    <p>{rawText || '-'}</p>
+                <div className="history-item-body compact">
+                  <p className="history-preview">{previewText}</p>
+                  <div className="history-item-actions">
+                    <button
+                      type="button"
+                      className="secondary-button history-action-button"
+                      onClick={() => void handleCopyHistoryItem(item)}
+                      disabled={loading || clearing || deletingId === item.id}
+                    >
+                      <Copy aria-hidden="true" />
+                      {t('history.copy')}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button history-action-button danger"
+                      onClick={() => void handleDeleteHistoryItem(item.id)}
+                      disabled={loading || clearing || deletingId === item.id}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      {t('history.delete')}
+                    </button>
                   </div>
                 </div>
 
@@ -182,4 +244,16 @@ export function HistoryPage({
       )}
     </section>
   );
+}
+
+function historyItemText(item: TranscriptHistoryItem) {
+  return item.final_text.trim() || item.raw_text.trim() || item.error_summary?.trim() || '-';
+}
+
+function truncateHistoryText(text: string) {
+  const chars = Array.from(text.trim());
+  if (chars.length <= HISTORY_PREVIEW_LENGTH) {
+    return chars.join('');
+  }
+  return `${chars.slice(0, HISTORY_PREVIEW_LENGTH).join('')}...`;
 }

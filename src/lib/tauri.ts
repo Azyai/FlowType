@@ -14,6 +14,7 @@ import type {
   AsrServiceCheckResult,
   AsrServiceConfig,
   ClearHistoryResult,
+  DeleteHistoryItemResult,
   DatabaseHealth,
   TranscriptHistoryPage,
   UpdateCheckResult,
@@ -90,6 +91,10 @@ export function checkAsrService(): Promise<AsrServiceCheckResult> {
 
 export function clearHistory(): Promise<ClearHistoryResult> {
   return nativeInvoke('clear_history', undefined, { deleted_count: 0 });
+}
+
+export function deleteHistoryItem(id: number): Promise<DeleteHistoryItemResult> {
+  return nativeInvoke('delete_history_item', { id }, { deleted_count: 0 });
 }
 
 export function getHistory(limit = 20, offset = 0): Promise<TranscriptHistoryPage> {

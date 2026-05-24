@@ -61,6 +61,10 @@ impl AppState {
         self.database.clear_transcript_history()
     }
 
+    pub fn delete_history_item(&self, id: i64) -> AppResult<usize> {
+        self.database.delete_transcript_history_item(id)
+    }
+
     pub fn get_history(&self, limit: u32, offset: u32) -> AppResult<TranscriptHistoryPage> {
         self.database.get_transcript_history(limit, offset)
     }

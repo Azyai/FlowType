@@ -84,6 +84,10 @@ export interface ClearHistoryResult {
   deleted_count: number;
 }
 
+export interface DeleteHistoryItemResult {
+  deleted_count: number;
+}
+
 export interface TranscriptHistoryItem {
   id: number;
   raw_text: string;

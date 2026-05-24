@@ -10,7 +10,7 @@ mod voice;
 
 use app::AppState;
 use commands::{
-    check_asr_service, check_update, clear_history, get_app_status, get_asr_service_config,
+    check_asr_service, check_update, clear_history, delete_history_item, get_app_status, get_asr_service_config,
     get_database_health, get_history, get_settings, open_about_window, open_settings_window, quit_app,
     reset_settings, save_asr_service_config, save_settings, set_autostart, start_voice_input,
     stop_voice_input, cancel_voice_input, get_voice_status, show_mascot_window, hide_mascot_window,
@@ -75,6 +75,7 @@ pub fn run() {
             set_autostart,
             get_database_health,
             clear_history,
+            delete_history_item,
             get_history,
             check_update,
             start_voice_input,

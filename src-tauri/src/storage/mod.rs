@@ -237,6 +237,12 @@ impl Database {
         Ok(deleted)
     }
 
+    pub fn delete_transcript_history_item(&self, id: i64) -> AppResult<usize> {
+        let connection = self.connection.lock().map_err(|_| crate::error::AppError::StateLock)?;
+        let deleted = connection.execute("DELETE FROM transcript_history WHERE id = ?1", params![id])?;
+        Ok(deleted)
+    }
+
     pub fn get_transcript_history(&self, limit: u32, offset: u32) -> AppResult<TranscriptHistoryPage> {
         let connection = self.connection.lock().map_err(|_| crate::error::AppError::StateLock)?;
         let mut statement = connection.prepare(
@@ -405,6 +411,43 @@ mod tests {
 
         assert_eq!(deleted, 1);
         assert_eq!(database.count_transcript_history().unwrap(), 0);
+    }
+
+    #[test]
+    fn transcript_history_item_can_be_deleted_by_id() {
+        let path = test_db_path("delete-history-item");
+        let database = Database::open(&path).unwrap();
+        let first_id = database
+            .insert_transcript_history(NewTranscriptHistory {
+                raw_text: "first",
+                final_text: "first",
+                output_style: "raw",
+                recognition_started_at: "1700000000",
+                recognition_duration_ms: 300,
+                injected: true,
+                error_code: None,
+                error_summary: None,
+            })
+            .unwrap();
+        database
+            .insert_transcript_history(NewTranscriptHistory {
+                raw_text: "second",
+                final_text: "second",
+                output_style: "clean",
+                recognition_started_at: "1700000001",
+                recognition_duration_ms: 400,
+                injected: false,
+                error_code: None,
+                error_summary: None,
+            })
+            .unwrap();
+
+        let deleted = database.delete_transcript_history_item(first_id).unwrap();
+        let page = database.get_transcript_history(10, 0).unwrap();
+
+        assert_eq!(deleted, 1);
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items[0].raw_text, "second");
     }
 
     #[test]
