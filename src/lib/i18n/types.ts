@@ -4,7 +4,6 @@ export type TranslationKey =
   | 'app.subtitle'
   | 'app.settingsSections'
   | 'loading'
-  | 'phase'
   | 'status.ready'
   | 'status.paused'
   | 'window.minimize'

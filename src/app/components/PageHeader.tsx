@@ -16,7 +16,6 @@ export function PageHeader({
   return (
     <header className="content-header">
       <div>
-        <p className="eyebrow">{t('phase')}</p>
         <div className="content-title-row">
           <h1>{title}</h1>
           {meta}

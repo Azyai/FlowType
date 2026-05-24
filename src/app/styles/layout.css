@@ -262,14 +262,6 @@ nav {
   margin-top: 18px;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: #7a8190;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 @media (max-width: 760px) {
   body {
     overflow: auto;

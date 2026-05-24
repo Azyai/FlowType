@@ -133,7 +133,6 @@ export default function App() {
                   updateResult={shell.updateResult}
                   onCheckUpdate={shell.handleCheckUpdate}
                   onAutostart={shell.handleAutostart}
-                  onClearHistory={handleClearHistory}
                 />
               )}
               {activePage === 'history' && (
@@ -147,7 +146,7 @@ export default function App() {
               )}
               {activePage === 'about' && <AboutPage />}
 
-              {activePage !== 'about' && (
+              {(activePage === 'hotkey' || activePage === 'advanced') && (
                 <FormActions onReset={shell.handleReset} />
               )}
             </form>

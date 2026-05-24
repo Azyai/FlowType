@@ -186,16 +186,7 @@ describe('FlowType settings shell', () => {
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
-    await user.click(screen.getByRole('button', { name: 'Clear history' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Clear history');
-    expect(screen.getByText('Clear all history records?')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
-
-    await waitFor(() => {
-      expect(bridge.clearHistory).toHaveBeenCalled();
-    });
-
-    expect(await screen.findByRole('status')).toHaveTextContent('History cleared, 0 records removed');
+    expect(screen.queryByRole('button', { name: 'Clear history' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
@@ -208,6 +199,7 @@ describe('FlowType settings shell', () => {
         })
       );
     });
+    expect(bridge.clearHistory).not.toHaveBeenCalled();
   });
 
   test('renders compact transcript history items and supports copy/delete actions with toast feedback', async () => {
@@ -251,6 +243,8 @@ describe('FlowType settings shell', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
     expect(screen.getByText('this is a long final transcrip...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save settings' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Copy' }));
     expect(await screen.findByRole('status')).toHaveTextContent('History item copied');

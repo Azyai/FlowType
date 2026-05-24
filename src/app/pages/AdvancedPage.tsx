@@ -7,15 +7,13 @@ export function AdvancedPage({
   setSettings,
   updateResult,
   onCheckUpdate,
-  onAutostart,
-  onClearHistory
+  onAutostart
 }: {
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
   updateResult: UpdateCheckResult | null;
   onCheckUpdate: () => void;
   onAutostart: (enabled: boolean) => void;
-  onClearHistory: () => Promise<unknown> | unknown;
 }) {
   const { t } = useI18n();
 
@@ -72,10 +70,6 @@ export function AdvancedPage({
           ))}
         </select>
       </label>
-      <button type="button" className="secondary-button" onClick={onClearHistory}>
-        {t('advanced.clearHistory')}
-      </button>
-
       <label className="switch-row">
         <input
           type="checkbox"
