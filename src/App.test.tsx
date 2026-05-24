@@ -77,6 +77,25 @@ describe('FlowType settings shell', () => {
       checked_at: '0'
     });
     vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
+    vi.spyOn(bridge, 'getHistory').mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          raw_text: 'raw transcript',
+          final_text: 'final transcript',
+          output_style: 'raw',
+          recognition_started_at: 1700000000,
+          recognition_duration_ms: 820,
+          injected: true,
+          error_code: null,
+          error_summary: null,
+          created_at: 1700000000
+        }
+      ],
+      total: 1,
+      limit: 20,
+      offset: 0
+    });
   });
 
   afterEach(() => {
@@ -212,6 +231,24 @@ describe('FlowType settings shell', () => {
           show_floating_window: false
         })
       );
+    });
+  });
+
+  test('renders transcript history from the native bridge and clears it on demand', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Status' });
+    await user.click(screen.getByRole('button', { name: 'History' }));
+
+    expect(await screen.findByText('final transcript')).toBeInTheDocument();
+    expect(screen.getByText('raw transcript')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear history' }));
+
+    await waitFor(() => {
+      expect(bridge.clearHistory).toHaveBeenCalled();
+      expect(bridge.getHistory).toHaveBeenCalledTimes(2);
     });
   });
 
