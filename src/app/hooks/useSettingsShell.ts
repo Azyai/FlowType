@@ -21,14 +21,6 @@ export interface ToastState {
   message: string;
 }
 
-function confirmAction(message: string) {
-  if (typeof window.confirm !== 'function') {
-    return true;
-  }
-
-  return window.confirm(message);
-}
-
 export function useSettingsShell() {
   const [activePage, setActivePage] = useState<PageId>('hotkey');
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -144,10 +136,6 @@ export function useSettingsShell() {
   }
 
   async function handleClearHistory(): Promise<ClearHistoryResult | null> {
-    if (!confirmAction(t('history.confirmClear'))) {
-      return null;
-    }
-
     try {
       const result = await clearHistory();
       showToast('success', t('notice.historyCleared', { count: result.deleted_count }));

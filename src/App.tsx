@@ -1,6 +1,7 @@
 import { Activity } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
+import { ConfirmDialog, type ConfirmDialogState } from './app/components/ConfirmDialog';
 import { DesktopTitlebar } from './app/components/DesktopTitlebar';
 import { FormActions } from './app/components/FormActions';
 import { LiveCaptionPage } from './app/pages/LiveCaptionPage';
@@ -25,6 +26,8 @@ export default function App() {
     enabled: boolean;
     retentionDays: number;
   } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const confirmResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
 
   if (isMascot) {
     return <MascotPage />;
@@ -36,6 +39,38 @@ export default function App() {
 
   const shell = useSettingsShell();
   const { activePage, activeTitle, settings, status } = shell;
+
+  const handleRequestConfirm = useCallback(
+    (options: Omit<ConfirmDialogState, 'confirmLabel' | 'cancelLabel'>) =>
+      new Promise<boolean>((resolve) => {
+        confirmResolverRef.current = resolve;
+        setConfirmDialog({
+          ...options,
+          confirmLabel: shell.t('actions.confirm'),
+          cancelLabel: shell.t('actions.cancel')
+        });
+      }),
+    [shell]
+  );
+
+  const closeConfirmDialog = useCallback((confirmed: boolean) => {
+    confirmResolverRef.current?.(confirmed);
+    confirmResolverRef.current = null;
+    setConfirmDialog(null);
+  }, []);
+
+  const handleClearHistory = useCallback(async () => {
+    const confirmed = await handleRequestConfirm({
+      title: shell.t('history.confirmClearTitle'),
+      message: shell.t('history.confirmClear'),
+      tone: 'danger'
+    });
+    if (!confirmed) {
+      return null;
+    }
+
+    return shell.handleClearHistory();
+  }, [handleRequestConfirm, shell]);
 
   if (!settings || !status) {
     const loadingLocale = resolveLocale('auto');
@@ -59,6 +94,11 @@ export default function App() {
       <main className="desktop-frame">
         <Sidebar activePage={activePage} status={status} onSelectPage={shell.setActivePage} />
         <Toast toast={shell.toast} />
+        <ConfirmDialog
+          dialog={confirmDialog}
+          onCancel={() => closeConfirmDialog(false)}
+          onConfirm={() => closeConfirmDialog(true)}
+        />
 
         <section className="workspace">
           <DesktopTitlebar />
@@ -93,15 +133,16 @@ export default function App() {
                   updateResult={shell.updateResult}
                   onCheckUpdate={shell.handleCheckUpdate}
                   onAutostart={shell.handleAutostart}
-                  onClearHistory={shell.handleClearHistory}
+                  onClearHistory={handleClearHistory}
                 />
               )}
               {activePage === 'history' && (
                 <HistoryPage
                   settings={settings}
-                  onClearHistory={shell.handleClearHistory}
+                  onClearHistory={handleClearHistory}
                   onToast={shell.showToast}
                   onSummaryChange={setHistorySummary}
+                  onRequestConfirm={handleRequestConfirm}
                 />
               )}
               {activePage === 'about' && <AboutPage />}

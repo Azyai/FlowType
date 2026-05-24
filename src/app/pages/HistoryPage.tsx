@@ -11,26 +11,20 @@ import type {
 } from '../../types';
 
 const PAGE_SIZE = 20;
-const HISTORY_PREVIEW_LENGTH = 20;
-
-function confirmAction(message: string) {
-  if (typeof window.confirm !== 'function') {
-    return true;
-  }
-
-  return window.confirm(message);
-}
+const HISTORY_PREVIEW_LENGTH = 30;
 
 export function HistoryPage({
   settings,
   onClearHistory,
   onToast,
-  onSummaryChange
+  onSummaryChange,
+  onRequestConfirm
 }: {
   settings: AppSettings;
   onClearHistory: () => Promise<{ deleted_count: number } | null> | { deleted_count: number } | null;
   onToast: (kind: 'success' | 'error', message: string) => void;
   onSummaryChange: (summary: { total: number; enabled: boolean; retentionDays: number }) => void;
+  onRequestConfirm: (options: { title: string; message: string; tone?: 'danger' | 'default' }) => Promise<boolean>;
 }) {
   const { locale, t } = useI18n();
   const [historyPage, setHistoryPage] = useState<TranscriptHistoryPageResult>({
@@ -78,6 +72,15 @@ export function HistoryPage({
   }, [historyPage.total, onSummaryChange, settings.history_retention_days, settings.save_history]);
 
   async function handleClearHistory() {
+    const confirmed = await onRequestConfirm({
+      title: t('history.confirmClearTitle'),
+      message: t('history.confirmClear'),
+      tone: 'danger'
+    });
+    if (!confirmed) {
+      return;
+    }
+
     setClearing(true);
     try {
       const result = await onClearHistory();
@@ -114,7 +117,12 @@ export function HistoryPage({
   }
 
   async function handleDeleteHistoryItem(id: number) {
-    if (!confirmAction(t('history.confirmDelete'))) {
+    const confirmed = await onRequestConfirm({
+      title: t('history.confirmDeleteTitle'),
+      message: t('history.confirmDelete'),
+      tone: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
 

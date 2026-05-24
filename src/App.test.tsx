@@ -36,11 +36,9 @@ const settings: AppSettings = {
 describe('FlowType settings shell', () => {
   const originalLanguage = navigator.language;
   const originalClipboard = navigator.clipboard;
-  const originalConfirm = window.confirm;
 
   beforeEach(() => {
     vi.useRealTimers();
-    window.confirm = vi.fn(() => true);
     Object.defineProperty(navigator, 'language', {
       value: 'en-US',
       configurable: true
@@ -106,7 +104,6 @@ describe('FlowType settings shell', () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    window.confirm = originalConfirm;
     Object.defineProperty(navigator, 'clipboard', {
       value: originalClipboard,
       configurable: true
@@ -190,9 +187,11 @@ describe('FlowType settings shell', () => {
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
     await user.click(screen.getByRole('button', { name: 'Clear history' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Clear history');
+    expect(screen.getByText('Clear all history records?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => {
-      expect(window.confirm).toHaveBeenCalledWith('Clear all history records?');
       expect(bridge.clearHistory).toHaveBeenCalled();
     });
 
@@ -257,9 +256,11 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('History item copied');
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Delete history record');
+    expect(screen.getByText('Delete this history record?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => {
-      expect(window.confirm).toHaveBeenCalledWith('Delete this history record?');
       expect(bridge.deleteHistoryItem).toHaveBeenCalledWith(1);
       expect(bridge.getHistory).toHaveBeenCalledTimes(2);
     });
