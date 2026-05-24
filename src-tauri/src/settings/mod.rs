@@ -141,7 +141,7 @@ impl Default for AppSettings {
             rtasr_language: RtasrLanguage::ZhCn,
             rtasr_timeout_ms: 10_000,
             output_style: OutputStyle::Raw,
-            clipboard_restore: ClipboardRestore::Always,
+            clipboard_restore: ClipboardRestore::Never,
             floating_window_position: FloatingWindowPosition::BottomRight,
             show_floating_window: true,
             floating_window_always_on_top: true,
@@ -180,7 +180,10 @@ impl ConfigStore {
 
         let text = fs::read_to_string(&self.path)?;
         match serde_json::from_str::<AppSettings>(&text) {
-            Ok(settings) => Ok(settings),
+            Ok(mut settings) => {
+                settings.clipboard_restore = ClipboardRestore::Never;
+                Ok(settings)
+            }
             Err(_) => {
                 self.move_corrupt_file()?;
                 let settings = AppSettings::default();
@@ -243,7 +246,7 @@ mod tests {
         assert_eq!(settings.rtasr_language, RtasrLanguage::ZhCn);
         assert_eq!(settings.rtasr_timeout_ms, 10_000);
         assert_eq!(settings.output_style, OutputStyle::Raw);
-        assert_eq!(settings.clipboard_restore, ClipboardRestore::Always);
+        assert_eq!(settings.clipboard_restore, ClipboardRestore::Never);
         assert_eq!(settings.floating_window_position, FloatingWindowPosition::BottomRight);
         assert!(settings.show_floating_window);
         assert!(settings.floating_window_always_on_top);
@@ -294,6 +297,7 @@ mod tests {
         assert_eq!(loaded.rtasr_language, RtasrLanguage::ZhEn);
         assert_eq!(loaded.rtasr_timeout_ms, 8_000);
         assert_eq!(loaded.output_style, OutputStyle::Clean);
+        assert_eq!(loaded.clipboard_restore, ClipboardRestore::Never);
         assert_eq!(loaded.history_retention_days, 14);
         assert_eq!(loaded.min_recording_ms, 500);
         assert_eq!(loaded.max_recording_ms, 60_000);
