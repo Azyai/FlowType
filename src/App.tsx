@@ -2,6 +2,7 @@ import { Activity } from 'lucide-react';
 
 import { DesktopTitlebar } from './app/components/DesktopTitlebar';
 import { FormActions } from './app/components/FormActions';
+import { LiveCaptionPage } from './app/pages/LiveCaptionPage';
 import { MascotPage } from './app/pages/MascotPage';
 import { PageHeader } from './app/components/PageHeader';
 import { Sidebar } from './app/components/Sidebar';
@@ -19,10 +20,16 @@ import { I18nContext, translate } from './lib/i18n/I18nContext';
 import { resolveLocale } from './lib/i18n/locale';
 
 export default function App() {
-  const isMascot = new URLSearchParams(window.location.search).get('window') === 'mascot';
+  const windowKind = new URLSearchParams(window.location.search).get('window');
+  const isMascot = windowKind === 'mascot';
+  const isLiveCaption = windowKind === 'live-caption';
 
   if (isMascot) {
     return <MascotPage />;
+  }
+
+  if (isLiveCaption) {
+    return <LiveCaptionPage />;
   }
 
   const shell = useSettingsShell();

@@ -31,6 +31,8 @@ const READ_POLL_INTERVAL: Duration = Duration::from_millis(5);
 const FINISH_MESSAGE: &[u8] = br#"{"end": true}"#;
 const POST_END_IDLE_TIMEOUT: Duration = Duration::from_millis(800);
 const POST_END_MAX_WAIT: Duration = Duration::from_secs(2);
+const SESSION_START_MAX_ATTEMPTS: usize = 2;
+const SESSION_START_RETRY_DELAY: Duration = Duration::from_millis(350);
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -100,12 +102,7 @@ pub fn start_streaming_session(
     settings: AppSettings,
     mut on_partial: impl FnMut(String) + Send + 'static,
 ) -> AppResult<StreamingRecognizer> {
-    let credentials = credentials_for(&settings)
-        .ok_or_else(|| AppError::AsrConfigMissing("RTASR credentials are incomplete.".to_string()))?;
-    let timeout = request_timeout(&settings);
-    let auth_url = build_auth_url(&credentials, &settings, SystemTime::now())?;
-    let mut socket = connect_websocket(&auth_url, timeout)?;
-    await_started(&mut socket)?;
+    let mut socket = start_session_socket_with_retry(&settings)?;
 
     let (command_tx, command_rx) = mpsc::channel();
     let (result_tx, result_rx) = mpsc::channel();
@@ -120,6 +117,51 @@ pub fn start_streaming_session(
         result_rx,
         join_handle: Some(join_handle),
     })
+}
+
+fn start_session_socket_with_retry(
+    settings: &AppSettings,
+) -> AppResult<WebSocket<MaybeTlsStream<TcpStream>>> {
+    let mut last_error = None;
+
+    for attempt in 1..=SESSION_START_MAX_ATTEMPTS {
+        match start_session_socket(settings) {
+            Ok(socket) => return Ok(socket),
+            Err(error) if attempt < SESSION_START_MAX_ATTEMPTS && is_retryable_session_start_error(&error) => {
+                log::warn!(
+                    "RTASR startup attempt {attempt}/{SESSION_START_MAX_ATTEMPTS} failed, retrying once: {error}"
+                );
+                last_error = Some(error);
+                thread::sleep(SESSION_START_RETRY_DELAY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        AppError::AsrServiceUnavailable("RTASR session could not be started.".to_string())
+    }))
+}
+
+fn start_session_socket(settings: &AppSettings) -> AppResult<WebSocket<MaybeTlsStream<TcpStream>>> {
+    let credentials = credentials_for(settings)
+        .ok_or_else(|| AppError::AsrConfigMissing("RTASR credentials are incomplete.".to_string()))?;
+    let timeout = request_timeout(settings);
+    let auth_url = build_auth_url(&credentials, settings, SystemTime::now())?;
+    let mut socket = connect_websocket(&auth_url, timeout)?;
+    await_started(&mut socket)?;
+    Ok(socket)
+}
+
+fn is_retryable_session_start_error(error: &AppError) -> bool {
+    let AppError::AsrServiceUnavailable(message) = error else {
+        return false;
+    };
+
+    message.contains("Timed out while connecting")
+        || message.contains("refused the connection")
+        || message.contains("closed the connection before the session started")
+        || message.contains("Network error while contacting the RTASR gateway")
 }
 
 fn run_session_loop(
@@ -754,5 +796,23 @@ mod tests {
         settings.rtasr_timeout_ms = 1_000;
 
         assert_eq!(request_timeout(&settings), Duration::from_millis(5_000));
+    }
+
+    #[test]
+    fn startup_retry_classifier_accepts_transient_transport_errors() {
+        let error = AppError::AsrServiceUnavailable(
+            "Timed out while connecting to the RTASR gateway. Please check network, proxy, or firewall access to rtasr.xfyun.cn:443.".to_string(),
+        );
+
+        assert!(is_retryable_session_start_error(&error));
+    }
+
+    #[test]
+    fn startup_retry_classifier_rejects_auth_errors() {
+        let error = AppError::AsrServiceUnavailable(
+            "RTASR authentication failed. Please verify that AppID and APIKey match the realtime transcription service.".to_string(),
+        );
+
+        assert!(!is_retryable_session_start_error(&error));
     }
 }

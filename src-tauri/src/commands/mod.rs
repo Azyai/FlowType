@@ -126,6 +126,9 @@ pub fn start_voice_input(
     trigger: VoiceTrigger,
 ) -> CommandResult<VoiceSessionEvent> {
     let settings = state.settings().map_err(error_response)?;
+    if settings.show_floating_window {
+        let _ = windows::spawn_live_caption_window(&app);
+    }
     into_command(state.start_voice_input(&app, &settings, trigger))
 }
 
@@ -151,15 +154,19 @@ pub fn get_voice_status(state: State<AppState>) -> CommandResult<VoiceSessionEve
 
 #[tauri::command]
 pub fn show_mascot_window(app: AppHandle) -> CommandResult<()> {
+    windows::spawn_live_caption_window(&app).map_err(error_response)?;
     into_command(windows::spawn_mascot_window(&app))
 }
 
 #[tauri::command]
 pub fn hide_mascot_window(app: AppHandle) -> CommandResult<()> {
-    let Some(window) = app.get_webview_window("mascot") else {
-        return Ok(());
-    };
-    into_command(window.hide().map_err(|error| AppError::Window(error.to_string())))
+    if let Some(window) = app.get_webview_window("mascot") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    if let Some(window) = app.get_webview_window("live-caption") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -201,14 +208,8 @@ fn save_settings_and_refresh_tray(
     
     // Broadcast setting changes to all windows
     let _ = app.emit("settings_updated", &saved);
-    
-    if show {
-        let _ = crate::desktop::windows::spawn_mascot_window(app);
-    } else {
-        if let Some(window) = app.get_webview_window("mascot") {
-            let _ = window.hide();
-        }
-    }
+
+    sync_floating_windows(app, show);
 
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after saving settings: {error:?}");
@@ -219,6 +220,7 @@ fn save_settings_and_refresh_tray(
 fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResult<AppSettings> {
     let saved = state.reset_settings()?;
     let _ = app.emit("settings_updated", &saved);
+    sync_floating_windows(app, saved.show_floating_window);
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after resetting settings: {error:?}");
     }
@@ -294,4 +296,19 @@ fn error_response(error: AppError) -> ErrorResponse {
     let response: ErrorResponse = error.into();
     log::error!("{}: {}", response.code, response.message);
     response
+}
+
+fn sync_floating_windows(app: &AppHandle, show: bool) {
+    if show {
+        let _ = crate::desktop::windows::spawn_mascot_window(app);
+        let _ = crate::desktop::windows::spawn_live_caption_window(app);
+        return;
+    }
+
+    if let Some(window) = app.get_webview_window("mascot") {
+        let _ = window.hide();
+    }
+    if let Some(window) = app.get_webview_window("live-caption") {
+        let _ = window.hide();
+    }
 }

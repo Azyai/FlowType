@@ -98,6 +98,8 @@ impl VoiceController {
         let mut machine = self.machine.lock().map_err(|_| AppError::StateLock)?;
         let event = machine.start(trigger)?;
         drop(machine);
+        emit_level(app, 0.0);
+        self.emit(app, &event);
 
         let session_id = self.next_session_id.fetch_add(1, Ordering::Relaxed) + 1;
         let activity = Arc::new(VoiceActivityTracker::new());
@@ -114,8 +116,9 @@ impl VoiceController {
         }) {
             Ok(recognizer) => recognizer,
             Err(error) => {
-                let _ = self.machine.lock().map_err(|_| AppError::StateLock)?.cancel();
+                let cancel_event = self.machine.lock().map_err(|_| AppError::StateLock)?.cancel();
                 emit_level(app, 0.0);
+                self.emit(app, &cancel_event);
                 return Err(error);
             }
         };
@@ -139,9 +142,10 @@ impl VoiceController {
         let recorder = match recorder {
             Ok(recorder) => recorder,
             Err(error) => {
-                let _ = self.machine.lock().map_err(|_| AppError::StateLock)?.cancel();
+                let cancel_event = self.machine.lock().map_err(|_| AppError::StateLock)?.cancel();
                 emit_level(app, 0.0);
                 recognizer.cancel();
+                self.emit(app, &cancel_event);
                 return Err(error);
             }
         };
@@ -150,7 +154,6 @@ impl VoiceController {
         *self.recorder.lock().map_err(|_| AppError::StateLock)? = Some(recorder);
         *self.recognizer.lock().map_err(|_| AppError::StateLock)? = Some(recognizer);
         emit_level(app, 0.0);
-        self.emit(app, &event);
         self.schedule_max_duration_stop(app.clone(), settings.max_recording_ms, trigger, session_id);
         if should_enable_auto_stop(trigger, settings) {
             self.schedule_auto_stop_on_silence(

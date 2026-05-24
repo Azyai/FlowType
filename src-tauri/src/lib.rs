@@ -45,6 +45,9 @@ pub fn run() {
                 if let Err(error) = desktop::windows::spawn_mascot_window(app.handle()) {
                     log::error!("failed to create mascot window: {error}");
                 }
+                if let Err(error) = desktop::windows::spawn_live_caption_window(app.handle()) {
+                    log::error!("failed to create live caption window: {error}");
+                }
             }
 
             desktop::hotkey::start_hotkey_listener(app.handle().clone());
