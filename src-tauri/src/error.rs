@@ -15,12 +15,20 @@ pub enum AppError {
     ConfigJson(#[from] serde_json::Error),
     #[error("database operation failed")]
     Database(#[from] rusqlite::Error),
-    #[error("native window operation failed")]
+    #[error("native window operation failed: {0}")]
     Window(String),
-    #[error("startup launch operation failed")]
+    #[error("startup launch operation failed: {0}")]
     Autostart(String),
-    #[error("update check failed")]
+    #[error("update check failed: {0}")]
     Update(String),
+    #[error("ASR service configuration is missing or incomplete: {0}")]
+    AsrConfigMissing(String),
+    #[error("ASR service is unavailable: {0}")]
+    AsrServiceUnavailable(String),
+    #[error("voice input operation failed: {0}")]
+    Voice(String),
+    #[error("audio capture failed: {0}")]
+    Audio(String),
     #[error("internal state lock failed")]
     StateLock,
 }
@@ -34,6 +42,10 @@ impl From<AppError> for ErrorResponse {
             AppError::Window(_) => "WINDOW",
             AppError::Autostart(_) => "AUTOSTART",
             AppError::Update(_) => "UPDATE",
+            AppError::AsrConfigMissing(_) => "ASR_CONFIG_MISSING",
+            AppError::AsrServiceUnavailable(_) => "ASR_SERVICE_UNAVAILABLE",
+            AppError::Voice(_) => "VOICE_INPUT",
+            AppError::Audio(_) => "AUDIO_CAPTURE",
             AppError::StateLock => "STATE_LOCK",
         };
 

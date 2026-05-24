@@ -1,13 +1,15 @@
 use crate::{
+    asr::{self, AsrServiceCheckResult, AsrServiceConfig},
     settings::{AppSettings, OutputStyle},
-    storage::DatabaseHealth,
+    storage::{DatabaseHealth, TranscriptHistoryPage},
+    voice::state::{VoiceSessionEvent, VoiceTrigger},
     error::{AppError, AppResult, CommandResult, ErrorResponse},
     app::AppState,
     updates::{self, UpdateCheckResult},
     desktop::{tray, windows},
 };
-use serde::Serialize;
-use tauri::{AppHandle, State};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, State, Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +18,33 @@ pub struct AppStatus {
     pub paused: bool,
     pub current_mode: String,
     pub tray_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ClearHistoryResult {
+    pub deleted_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteHistoryItemResult {
+    pub deleted_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AsrServiceConfigInput {
+    pub rtasr_app_id: String,
+    pub rtasr_api_key: String,
+    pub rtasr_language: crate::settings::RtasrLanguage,
+    pub rtasr_timeout_ms: u64,
+}
+
+#[tauri::command]
+pub fn toggle_recording(app: AppHandle, state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    let settings = state.settings().map_err(error_response)?;
+    if settings.show_floating_window {
+        let _ = windows::spawn_live_caption_window(&app);
+    }
+    into_command(state.toggle_voice_input(app, settings, VoiceTrigger::Mascot))
 }
 
 #[tauri::command]
@@ -62,6 +91,94 @@ pub fn check_update(state: State<AppState>) -> CommandResult<UpdateCheckResult> 
 }
 
 #[tauri::command]
+pub fn get_asr_service_config(state: State<AppState>) -> CommandResult<AsrServiceConfig> {
+    into_command(state.settings().map(|settings| asr::service_config(&settings)))
+}
+
+#[tauri::command]
+pub fn save_asr_service_config(
+    app: AppHandle,
+    state: State<AppState>,
+    config: AsrServiceConfigInput,
+) -> CommandResult<AppSettings> {
+    into_command(save_asr_config_and_refresh_tray(&app, &state, config))
+}
+
+#[tauri::command]
+pub fn check_asr_service(state: State<AppState>) -> CommandResult<AsrServiceCheckResult> {
+    into_command(state.settings().map(|settings| asr::check_service(&settings)))
+}
+
+#[tauri::command]
+pub fn clear_history(state: State<AppState>) -> CommandResult<ClearHistoryResult> {
+    into_command(state.clear_history().map(|deleted_count| ClearHistoryResult { deleted_count }))
+}
+
+#[tauri::command]
+pub fn delete_history_item(state: State<AppState>, id: i64) -> CommandResult<DeleteHistoryItemResult> {
+    into_command(state.delete_history_item(id).map(|deleted_count| DeleteHistoryItemResult { deleted_count }))
+}
+
+#[tauri::command]
+pub fn get_history(
+    state: State<AppState>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> CommandResult<TranscriptHistoryPage> {
+    into_command(state.get_history(limit.unwrap_or(20), offset.unwrap_or(0)))
+}
+
+#[tauri::command]
+pub fn start_voice_input(
+    app: AppHandle,
+    state: State<AppState>,
+    trigger: VoiceTrigger,
+) -> CommandResult<VoiceSessionEvent> {
+    let settings = state.settings().map_err(error_response)?;
+    if settings.show_floating_window {
+        let _ = windows::spawn_live_caption_window(&app);
+    }
+    into_command(state.start_voice_input(&app, &settings, trigger))
+}
+
+#[tauri::command]
+pub fn stop_voice_input(
+    app: AppHandle,
+    state: State<AppState>,
+    trigger: VoiceTrigger,
+) -> CommandResult<VoiceSessionEvent> {
+    let settings = state.settings().map_err(error_response)?;
+    into_command(state.stop_voice_input(app, settings, trigger))
+}
+
+#[tauri::command]
+pub fn cancel_voice_input(app: AppHandle, state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    into_command(state.cancel_voice_input(&app))
+}
+
+#[tauri::command]
+pub fn get_voice_status(state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
+    into_command(state.voice_status().map(VoiceSessionEvent::status))
+}
+
+#[tauri::command]
+pub fn show_mascot_window(app: AppHandle) -> CommandResult<()> {
+    windows::spawn_live_caption_window(&app).map_err(error_response)?;
+    into_command(windows::spawn_mascot_window(&app))
+}
+
+#[tauri::command]
+pub fn hide_mascot_window(app: AppHandle) -> CommandResult<()> {
+    if let Some(window) = app.get_webview_window("mascot") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    if let Some(window) = app.get_webview_window("live-caption") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_settings_window(app: AppHandle) -> CommandResult<()> {
     into_command(windows::show_main_window(&app))
 }
@@ -81,12 +198,28 @@ pub fn set_output_style(state: &AppState, output_style: OutputStyle) -> CommandR
     into_command(state.update_output_style(output_style))
 }
 
+#[tauri::command]
+pub fn set_output_mode(
+    app: AppHandle,
+    state: State<AppState>,
+    output_style: OutputStyle,
+) -> CommandResult<AppSettings> {
+    into_command(save_output_style_and_refresh_tray(&app, &state, output_style))
+}
+
 fn save_settings_and_refresh_tray(
     app: &AppHandle,
     state: &AppState,
     settings: AppSettings,
 ) -> AppResult<AppSettings> {
+    let show = settings.show_floating_window;
     let saved = state.save_settings(settings)?;
+    
+    // Broadcast setting changes to all windows
+    let _ = app.emit("settings_updated", &saved);
+
+    sync_floating_windows(app, show);
+
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after saving settings: {error:?}");
     }
@@ -95,10 +228,38 @@ fn save_settings_and_refresh_tray(
 
 fn reset_settings_and_refresh_tray(app: &AppHandle, state: &AppState) -> AppResult<AppSettings> {
     let saved = state.reset_settings()?;
+    let _ = app.emit("settings_updated", &saved);
+    sync_floating_windows(app, saved.show_floating_window);
     if let Err(error) = tray::refresh(app) {
         log::warn!("failed to refresh tray after resetting settings: {error:?}");
     }
     Ok(saved)
+}
+
+fn save_output_style_and_refresh_tray(
+    app: &AppHandle,
+    state: &AppState,
+    output_style: OutputStyle,
+) -> AppResult<AppSettings> {
+    let saved = state.update_output_style(output_style)?;
+    let _ = app.emit("settings_updated", &saved);
+    if let Err(error) = tray::refresh(app) {
+        log::warn!("failed to refresh tray after setting output mode: {error:?}");
+    }
+    Ok(saved)
+}
+
+fn save_asr_config_and_refresh_tray(
+    app: &AppHandle,
+    state: &AppState,
+    config: AsrServiceConfigInput,
+) -> AppResult<AppSettings> {
+    let mut settings = state.settings()?;
+    settings.rtasr_app_id = config.rtasr_app_id;
+    settings.rtasr_api_key = config.rtasr_api_key;
+    settings.rtasr_language = config.rtasr_language;
+    settings.rtasr_timeout_ms = config.rtasr_timeout_ms;
+    save_settings_and_refresh_tray(app, state, settings)
 }
 
 pub fn app_status(state: &AppState) -> AppResult<AppStatus> {
@@ -137,9 +298,26 @@ fn update_check(state: &AppState) -> AppResult<UpdateCheckResult> {
 }
 
 fn into_command<T>(result: AppResult<T>) -> CommandResult<T> {
-    result.map_err(|error| {
-        let response: ErrorResponse = error.into();
-        log::error!("{}: {}", response.code, response.message);
-        response
-    })
+    result.map_err(error_response)
+}
+
+fn error_response(error: AppError) -> ErrorResponse {
+    let response: ErrorResponse = error.into();
+    log::error!("{}: {}", response.code, response.message);
+    response
+}
+
+fn sync_floating_windows(app: &AppHandle, show: bool) {
+    if show {
+        let _ = crate::desktop::windows::spawn_mascot_window(app);
+        let _ = crate::desktop::windows::spawn_live_caption_window(app);
+        return;
+    }
+
+    if let Some(window) = app.get_webview_window("mascot") {
+        let _ = window.hide();
+    }
+    if let Some(window) = app.get_webview_window("live-caption") {
+        let _ = window.hide();
+    }
 }

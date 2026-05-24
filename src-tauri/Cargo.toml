@@ -17,12 +17,24 @@ log = "0.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = "=1.0.145"
 sys-locale = "0.3"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-log = "2"
+rdev = "0.5"
+lazy_static = "1.4"
 thiserror = "2"
+arboard = "3"
+base64 = "0.22"
+cpal = "0.15"
+hmac = "0.12"
+httpdate = "1"
+md5 = "0.7"
+sha1 = "0.10"
+sha2 = "0.10"
+tungstenite = { version = "0.24", default-features = false, features = ["native-tls", "handshake"] }
+urlencoding = "2"
 
 [dev-dependencies]
 pretty_assertions = "1"

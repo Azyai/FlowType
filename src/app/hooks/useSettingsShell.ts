@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 
 import { PageId, pageTitleKey } from '../config/navigation';
 import {
   checkUpdate,
+  clearHistory,
   getAppStatus,
-  getDatabaseHealth,
   getSettings,
   resetSettings,
   saveSettings,
@@ -13,7 +14,7 @@ import {
 import { readableError } from '../../lib/formatters/errors';
 import { resolveLocale } from '../../lib/i18n/locale';
 import { translate } from '../../lib/i18n/I18nContext';
-import type { AppSettings, AppStatus, DatabaseHealth, UpdateCheckResult } from '../../types';
+import type { AppSettings, AppStatus, ClearHistoryResult, UpdateCheckResult } from '../../types';
 
 export interface ToastState {
   kind: 'success' | 'error';
@@ -21,10 +22,9 @@ export interface ToastState {
 }
 
 export function useSettingsShell() {
-  const [activePage, setActivePage] = useState<PageId>('status');
+  const [activePage, setActivePage] = useState<PageId>('hotkey');
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
-  const [databaseHealth, setDatabaseHealth] = useState<DatabaseHealth | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -33,16 +33,14 @@ export function useSettingsShell() {
 
     async function load() {
       try {
-        const [loadedSettings, loadedStatus, loadedDatabaseHealth] = await Promise.all([
+        const [loadedSettings, loadedStatus] = await Promise.all([
           getSettings(),
-          getAppStatus(),
-          getDatabaseHealth()
+          getAppStatus()
         ]);
 
         if (!alive) return;
         setSettings(loadedSettings);
         setStatus(loadedStatus);
-        setDatabaseHealth(loadedDatabaseHealth);
       } catch (loadError) {
         if (!alive) return;
         showToast('error', readableError(loadError));
@@ -50,8 +48,19 @@ export function useSettingsShell() {
     }
 
     load();
+
+    const unlistenSettings =
+      '__TAURI_INTERNALS__' in window
+        ? listen<AppSettings>('settings_updated', (event) => {
+            if (alive) {
+              setSettings(event.payload);
+            }
+          })
+        : Promise.resolve(() => {});
+
     return () => {
       alive = false;
+      unlistenSettings.then((fn) => fn());
     };
   }, []);
 
@@ -126,12 +135,23 @@ export function useSettingsShell() {
     }
   }
 
+  async function handleClearHistory(): Promise<ClearHistoryResult | null> {
+    try {
+      const result = await clearHistory();
+      showToast('success', t('notice.historyCleared', { count: result.deleted_count }));
+      return result;
+    } catch (historyError) {
+      showToast('error', readableError(historyError));
+      throw historyError;
+    }
+  }
+
   return {
     activePage,
     activeTitle,
-    databaseHealth,
     handleAutostart,
     handleCheckUpdate,
+    handleClearHistory,
     handleReset,
     handleSave,
     locale,
@@ -139,6 +159,7 @@ export function useSettingsShell() {
     setActivePage,
     setSettings,
     settings,
+    showToast,
     status,
     t,
     toast,

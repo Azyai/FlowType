@@ -1,0 +1,281 @@
+:root,
+html,
+body,
+#root {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent !important;
+  background-color: rgba(0, 0, 0, 0) !important;
+}
+
+.mascot-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+  background: transparent !important;
+  background-color: rgba(0, 0, 0, 0) !important;
+}
+
+.mascot-ripple {
+  --voice-level: 0;
+  position: absolute;
+  top: calc(50% - 36px);
+  left: 50%;
+  width: 88px;
+  height: 88px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.mascot-speaking-halo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(56px + var(--voice-level) * 12px);
+  height: calc(56px + var(--voice-level) * 12px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 232, 173, 0.18) 0%, rgba(255, 211, 108, 0.12) 42%, rgba(255, 154, 74, 0) 74%);
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  animation: mascot-speaking-halo-pulse 900ms ease-in-out infinite;
+  pointer-events: none;
+}
+
+.mascot-speaking-halo::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  box-shadow: none;
+  transform: scale(calc(0.96 + var(--voice-level) * 0.08));
+  opacity: 0.88;
+}
+
+.mascot-speaking-halo::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 247, 214, 0.98) 36deg,
+      rgba(255, 211, 108, 1) 62deg,
+      rgba(255, 255, 255, 0) 108deg,
+      rgba(255, 255, 255, 0) 360deg
+    );
+  -webkit-mask: radial-gradient(circle, transparent calc(50% - 4px), #000 calc(50% - 2px), #000 calc(50% + 4px), transparent calc(50% + 6px));
+  mask: radial-gradient(circle, transparent calc(50% - 4px), #000 calc(50% - 2px), #000 calc(50% + 4px), transparent calc(50% + 6px));
+  animation: mascot-speaking-halo-scan 1.1s linear infinite;
+  opacity: 0.96;
+}
+
+.mascot-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  background-color: rgba(59, 130, 246, 0.7);
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    background-color 300ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.mascot-avatar:focus,
+.mascot-avatar:focus-visible {
+  outline: none;
+}
+
+.mascot-avatar:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+.mascot-avatar.idle {
+  background-color: rgba(59, 130, 246, 0.7);
+  animation: mascot-float 3.6s ease-in-out infinite;
+}
+
+.mascot-avatar.listening {
+  background-color: rgba(248, 113, 113, 0.7);
+  animation: mascot-listen 1.2s ease-in-out infinite;
+}
+
+.mascot-avatar.uploading,
+.mascot-avatar.recognizing {
+  background-color: rgba(168, 85, 247, 0.7);
+  animation: mascot-spin 1.6s linear infinite;
+}
+
+.mascot-avatar.injecting {
+  background-color: rgba(59, 130, 246, 0.7);
+  animation: mascot-pop 600ms ease;
+}
+
+.mascot-avatar.success {
+  background-color: rgba(59, 130, 246, 0.7);
+  animation: mascot-pop 600ms ease;
+}
+
+.mascot-avatar.failed {
+  background-color: rgba(59, 130, 246, 0.7);
+  animation: mascot-shake 420ms ease;
+}
+
+.mascot-face {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 32px;
+}
+
+.mascot-eyes {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 7px;
+  height: 9px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 16px 0 0 #fff;
+}
+
+.mascot-eyes.blink {
+  animation: mascot-blink 4s infinite;
+}
+
+.mascot-tooltip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: grid;
+  gap: 3px;
+  min-width: 96px;
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #1f2937;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+
+.mascot-tooltip span {
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes mascot-listen {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes mascot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mascot-pop {
+  0% {
+    transform: scale(0.88);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes mascot-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-4px);
+  }
+  70% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes mascot-blink {
+  0%,
+  96%,
+  98%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes mascot-speaking-halo-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
+@keyframes mascot-speaking-halo-scan {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-speaking-halo,
+  .mascot-speaking-halo::after,
+  .mascot-avatar,
+  .mascot-eyes.blink {
+    animation: none !important;
+  }
+}
