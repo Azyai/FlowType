@@ -5,6 +5,7 @@ import {
   fallbackAsrServiceCheck,
   fallbackAsrServiceConfig,
   fallbackDatabaseHealth,
+  fallbackTranscriptHistoryPage,
   fallbackStatus
 } from './defaults';
 import type {
@@ -14,6 +15,7 @@ import type {
   AsrServiceConfig,
   ClearHistoryResult,
   DatabaseHealth,
+  TranscriptHistoryPage,
   UpdateCheckResult,
   VoiceSessionEvent,
   VoiceTrigger,
@@ -92,6 +94,10 @@ export function checkAsrService(): Promise<AsrServiceCheckResult> {
 
 export function clearHistory(): Promise<ClearHistoryResult> {
   return nativeInvoke('clear_history', undefined, { deleted_count: 0 });
+}
+
+export function getHistory(limit = 20, offset = 0): Promise<TranscriptHistoryPage> {
+  return nativeInvoke('get_history', { limit, offset }, { ...fallbackTranscriptHistoryPage, limit, offset });
 }
 
 export function startVoiceInput(trigger: VoiceTrigger): Promise<VoiceSessionEvent> {

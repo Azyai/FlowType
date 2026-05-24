@@ -5,13 +5,15 @@ pub mod state;
 
 use crate::{
     error::{AppError, AppResult},
-    settings::AppSettings,
+    settings::{AppSettings, OutputStyle},
+    storage::NewTranscriptHistory,
     voice::{
         audio::{AudioRecorder, RecordedAudio},
         state::{StopDecision, VoiceSessionEvent, VoiceStateMachine, VoiceStatus, VoiceTrigger},
     },
 };
 use std::sync::Mutex;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub struct VoiceController {
@@ -48,8 +50,12 @@ impl VoiceController {
         let event = machine.start(trigger)?;
         drop(machine);
 
-        let recorder = AudioRecorder::start()?;
+        let app_handle = app.clone();
+        let recorder = AudioRecorder::start(move |level| {
+            emit_level(&app_handle, level);
+        })?;
         *self.recorder.lock().map_err(|_| AppError::StateLock)? = Some(recorder);
+        emit_level(app, 0.0);
         self.emit(app, &event);
         self.schedule_max_duration_stop(app.clone(), settings.max_recording_ms);
         Ok(event)
@@ -70,6 +76,7 @@ impl VoiceController {
                 pcm: Vec::new(),
                 sample_rate: 16_000,
             });
+        emit_level(&app, 0.0);
 
         match decision {
             StopDecision::DiscardTooShort { message, .. } => {
@@ -87,6 +94,7 @@ impl VoiceController {
 
     pub fn cancel(&self, app: &AppHandle) -> AppResult<VoiceSessionEvent> {
         self.recorder.lock().map_err(|_| AppError::StateLock)?.take();
+        emit_level(app, 0.0);
         let event = self.machine.lock().map_err(|_| AppError::StateLock)?.cancel();
         self.emit(app, &event);
         Ok(event)
@@ -132,6 +140,8 @@ impl VoiceController {
             let Some(state) = app.try_state::<crate::app::AppState>() else {
                 return;
             };
+            let recognition_started_at = now_unix_seconds().to_string();
+            let recognition_started = Instant::now();
             let _ = state.transition_voice(&app, VoiceStatus::Recognizing);
             let recognition = iflytek::recognize_blocking(&settings, audio, |partial| {
                 state.emit_voice_event(
@@ -139,29 +149,131 @@ impl VoiceController {
                     VoiceSessionEvent::partial(partial),
                 );
             });
+            let recognition_duration_ms = elapsed_millis_i64(recognition_started);
 
             let recognized = match recognition {
                 Ok(result) if !result.text.trim().is_empty() => result.text,
                 Ok(_) => {
+                    let message = "No speech text was recognized.".to_string();
+                    record_history_if_enabled(
+                        &state,
+                        &settings,
+                        "",
+                        "",
+                        &recognition_started_at,
+                        recognition_duration_ms,
+                        false,
+                        Some("ASR_EMPTY"),
+                        Some(message.as_str()),
+                    );
                     state.fail_voice(&app, "ASR_EMPTY", "No speech text was recognized.");
                     return;
                 }
                 Err(error) => {
-                    state.fail_voice(&app, "ASR_FAILED", error.to_string());
+                    let message = error.to_string();
+                    record_history_if_enabled(
+                        &state,
+                        &settings,
+                        "",
+                        "",
+                        &recognition_started_at,
+                        recognition_duration_ms,
+                        false,
+                        Some("ASR_FAILED"),
+                        Some(message.as_str()),
+                    );
+                    state.fail_voice(&app, "ASR_FAILED", message);
                     return;
                 }
             };
 
             let _ = state.transition_voice(&app, VoiceStatus::Injecting);
             match inject::inject_text(&recognized, &settings.clipboard_restore) {
-                Ok(_) => {
+                Ok(outcome) => {
+                    record_history_if_enabled(
+                        &state,
+                        &settings,
+                        &recognized,
+                        &recognized,
+                        &recognition_started_at,
+                        recognition_duration_ms,
+                        matches!(outcome, inject::InjectionOutcome::Pasted),
+                        None,
+                        None,
+                    );
                     state.emit_voice_event(&app, VoiceSessionEvent::final_text(recognized));
                     let _ = state.transition_voice(&app, VoiceStatus::Success);
                 }
                 Err(error) => {
-                    state.fail_voice(&app, "INJECT_FAILED", error.to_string());
+                    let message = error.to_string();
+                    record_history_if_enabled(
+                        &state,
+                        &settings,
+                        &recognized,
+                        &recognized,
+                        &recognition_started_at,
+                        recognition_duration_ms,
+                        false,
+                        Some("INJECT_FAILED"),
+                        Some(message.as_str()),
+                    );
+                    state.fail_voice(&app, "INJECT_FAILED", message);
                 }
             }
         });
+    }
+}
+
+fn record_history_if_enabled(
+    state: &crate::app::AppState,
+    settings: &AppSettings,
+    raw_text: &str,
+    final_text: &str,
+    recognition_started_at: &str,
+    recognition_duration_ms: i64,
+    injected: bool,
+    error_code: Option<&str>,
+    error_summary: Option<&str>,
+) {
+    if !settings.save_history {
+        return;
+    }
+
+    if let Err(error) = state.record_transcript_history(NewTranscriptHistory {
+        raw_text,
+        final_text,
+        output_style: output_style_label(&settings.output_style),
+        recognition_started_at,
+        recognition_duration_ms,
+        injected,
+        error_code,
+        error_summary,
+    }) {
+        log::warn!("failed to record transcript history: {error}");
+    }
+}
+
+fn output_style_label(output_style: &OutputStyle) -> &'static str {
+    match output_style {
+        OutputStyle::Raw => "raw",
+        OutputStyle::Clean => "clean",
+        OutputStyle::Formal => "formal",
+    }
+}
+
+fn now_unix_seconds() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or_default()
+}
+
+fn elapsed_millis_i64(started_at: Instant) -> i64 {
+    started_at.elapsed().as_millis().min(i64::MAX as u128) as i64
+}
+
+fn emit_level(app: &AppHandle, level: f32) {
+    if let Err(error) = app.emit("voice_level_changed", level.clamp(0.0, 1.0)) {
+        log::warn!("failed to emit voice level: {error}");
     }
 }

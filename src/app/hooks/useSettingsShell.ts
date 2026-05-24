@@ -54,12 +54,15 @@ export function useSettingsShell() {
     }
 
     load();
-    
-    const unlistenSettings = listen<AppSettings>('settings_updated', (event) => {
-      if (alive) {
-        setSettings(event.payload);
-      }
-    });
+
+    const unlistenSettings =
+      '__TAURI_INTERNALS__' in window
+        ? listen<AppSettings>('settings_updated', (event) => {
+            if (alive) {
+              setSettings(event.payload);
+            }
+          })
+        : Promise.resolve(() => {});
 
     return () => {
       alive = false;

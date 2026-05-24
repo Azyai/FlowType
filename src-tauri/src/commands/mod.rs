@@ -1,7 +1,7 @@
 use crate::{
     asr::{self, AsrServiceCheckResult, AsrServiceConfig},
     settings::{AppSettings, OutputStyle},
-    storage::DatabaseHealth,
+    storage::{DatabaseHealth, TranscriptHistoryPage},
     voice::state::{VoiceSessionEvent, VoiceStatus, VoiceTrigger},
     error::{AppError, AppResult, CommandResult, ErrorResponse},
     app::AppState,
@@ -112,6 +112,15 @@ pub fn check_asr_service(state: State<AppState>) -> CommandResult<AsrServiceChec
 #[tauri::command]
 pub fn clear_history(state: State<AppState>) -> CommandResult<ClearHistoryResult> {
     into_command(state.clear_history().map(|deleted_count| ClearHistoryResult { deleted_count }))
+}
+
+#[tauri::command]
+pub fn get_history(
+    state: State<AppState>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> CommandResult<TranscriptHistoryPage> {
+    into_command(state.get_history(limit.unwrap_or(20), offset.unwrap_or(0)))
 }
 
 #[tauri::command]

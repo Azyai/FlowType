@@ -15,17 +15,17 @@ pub enum AppError {
     ConfigJson(#[from] serde_json::Error),
     #[error("database operation failed")]
     Database(#[from] rusqlite::Error),
-    #[error("native window operation failed")]
+    #[error("native window operation failed: {0}")]
     Window(String),
-    #[error("startup launch operation failed")]
+    #[error("startup launch operation failed: {0}")]
     Autostart(String),
     #[error("update check failed: {0}")]
     Update(String),
-    #[error("ASR service configuration is missing or incomplete")]
+    #[error("ASR service configuration is missing or incomplete: {0}")]
     AsrConfigMissing(String),
-    #[error("ASR service is unavailable")]
+    #[error("ASR service is unavailable: {0}")]
     AsrServiceUnavailable(String),
-    #[error("history storage operation failed")]
+    #[error("history storage operation failed: {0}")]
     HistoryStorage(String),
     #[error("voice input operation failed: {0}")]
     Voice(String),

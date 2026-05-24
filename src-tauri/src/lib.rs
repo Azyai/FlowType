@@ -11,7 +11,7 @@ mod voice;
 use app::AppState;
 use commands::{
     check_asr_service, check_update, clear_history, get_app_status, get_asr_service_config,
-    get_database_health, get_settings, open_about_window, open_settings_window, quit_app,
+    get_database_health, get_history, get_settings, open_about_window, open_settings_window, quit_app,
     reset_settings, save_asr_service_config, save_settings, set_autostart, start_voice_input,
     stop_voice_input, cancel_voice_input, get_voice_status, show_mascot_window, hide_mascot_window,
     set_output_mode, toggle_recording,
@@ -34,6 +34,9 @@ pub fn run() {
             let config_store = ConfigStore::new(app_data_dir.join("settings.json"));
             let settings = config_store.load()?;
             let database = Database::open(app_data_dir.join("app.db"))?;
+            if let Err(error) = database.cleanup_transcript_history(settings.history_retention_days) {
+                log::warn!("failed to cleanup transcript history during startup: {error}");
+            }
 
             app.manage(AppState::new(config_store, settings.clone(), database));
             tray::create(app)?;
@@ -69,6 +72,7 @@ pub fn run() {
             set_autostart,
             get_database_health,
             clear_history,
+            get_history,
             check_update,
             start_voice_input,
             stop_voice_input,

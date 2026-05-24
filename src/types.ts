@@ -93,6 +93,26 @@ export interface ClearHistoryResult {
   deleted_count: number;
 }
 
+export interface TranscriptHistoryItem {
+  id: number;
+  raw_text: string;
+  final_text: string;
+  output_style: OutputStyle;
+  recognition_started_at: number;
+  recognition_duration_ms: number;
+  injected: boolean;
+  error_code: string | null;
+  error_summary: string | null;
+  created_at: number;
+}
+
+export interface TranscriptHistoryPage {
+  items: TranscriptHistoryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface VoiceSessionEvent {
   status: AppStateStatus;
   transcript_partial: string | null;

@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import type { AppStateStatus, VoiceSessionEvent } from '../../types';
-import { getSettings, saveSettings, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
+import { getSettings, hideMascotWindow, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
 import '../styles/mascot.css';
 
 import { Menu } from '@tauri-apps/api/menu';
@@ -15,6 +15,7 @@ const ACTIVE_STATUSES: AppStateStatus[] = ['Listening', 'Uploading', 'Recognizin
 export function MascotPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
   const [partial, setPartial] = useState('');
+  const [voiceLevel, setVoiceLevel] = useState(0);
   const [locale, setLocale] = useState(resolveLocale('auto'));
   const dragMoved = useRef(false);
 
@@ -39,18 +40,28 @@ export function MascotPage() {
       }
       if (event.payload.status === 'Idle') {
         setPartial('');
+        setVoiceLevel(0);
       }
     });
     const unlistenLegacy = listen<AppStateStatus>('status_changed', (event) => {
       setStatus(event.payload);
+      if (event.payload !== 'Listening') {
+        setVoiceLevel(0);
+      }
+    });
+    const unlistenVoiceLevel = listen<number>('voice_level_changed', (event) => {
+      setVoiceLevel(Math.max(0, Math.min(1, event.payload)));
     });
 
     return () => {
       unlistenVoice.then((fn) => fn());
       unlistenLegacy.then((fn) => fn());
+      unlistenVoiceLevel.then((fn) => fn());
     };
   }, []);
 
+  const showVoiceRipple = status === 'Listening';
+  const isSpeaking = voiceLevel > 0.035;
   async function handleMouseDown(event: React.MouseEvent) {
     if (event.button !== 0) return;
     dragMoved.current = false;
@@ -118,10 +129,7 @@ export function MascotPage() {
           {
             id: 'hide',
             text: t('label.hideFloatingWindow'),
-            action: async () => {
-              const latest = await getSettings();
-              await saveSettings({ ...latest, show_floating_window: false });
-            }
+            action: hideMascotWindow
           }
         ]
       });
@@ -133,6 +141,20 @@ export function MascotPage() {
 
   return (
     <div className="mascot-container" onContextMenu={handleContextMenu}>
+      {showVoiceRipple && isSpeaking && (
+        <div
+          className="mascot-ripple speaking"
+          aria-hidden="true"
+          style={
+            {
+              '--voice-level': `${voiceLevel.toFixed(3)}`,
+              '--speech-boost': isSpeaking ? '1' : '0'
+            } as React.CSSProperties
+          }
+        >
+          <span className="mascot-speaking-halo" />
+        </div>
+      )}
       <button
         type="button"
         aria-label="FlowType voice mascot"

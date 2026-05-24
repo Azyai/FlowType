@@ -1,6 +1,6 @@
 use crate::{
     settings::{AppSettings, ConfigStore, OutputStyle},
-    storage::{Database, DatabaseHealth},
+    storage::{Database, DatabaseHealth, NewTranscriptHistory, TranscriptHistoryPage},
     voice::{
         state::{VoiceSessionEvent, VoiceStatus, VoiceTrigger},
         VoiceController,
@@ -59,6 +59,14 @@ impl AppState {
 
     pub fn clear_history(&self) -> AppResult<usize> {
         self.database.clear_transcript_history()
+    }
+
+    pub fn get_history(&self, limit: u32, offset: u32) -> AppResult<TranscriptHistoryPage> {
+        self.database.get_transcript_history(limit, offset)
+    }
+
+    pub fn record_transcript_history(&self, entry: NewTranscriptHistory<'_>) -> AppResult<i64> {
+        self.database.insert_transcript_history(entry)
     }
 
     pub fn voice_status(&self) -> AppResult<VoiceStatus> {

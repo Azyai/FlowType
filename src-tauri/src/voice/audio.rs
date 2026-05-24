@@ -5,6 +5,7 @@ use cpal::{
 };
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub struct RecordedAudio {
@@ -19,7 +20,7 @@ pub struct AudioRecorder {
 }
 
 impl AudioRecorder {
-    pub fn start() -> AppResult<Self> {
+    pub fn start(on_level: impl Fn(f32) + Send + Sync + 'static) -> AppResult<Self> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
@@ -30,6 +31,8 @@ impl AudioRecorder {
         let sample_rate = config.sample_rate().0;
         let samples = Arc::new(Mutex::new(Vec::new()));
         let writer = samples.clone();
+        let on_level = Arc::new(on_level);
+        let last_level_emit = Arc::new(Mutex::new(Instant::now().checked_sub(Duration::from_millis(80)).unwrap_or_else(Instant::now)));
         
         let (stop_tx, stop_rx) = channel::<()>();
         let (ready_tx, ready_rx) = channel::<Result<(), String>>();
@@ -38,24 +41,57 @@ impl AudioRecorder {
             let error_callback = |error| log::error!("audio input stream failed: {error}");
             
             let stream_result = match config.sample_format() {
-                SampleFormat::I16 => device.build_input_stream(
-                    &config.into(),
-                    move |data: &[i16], _| push_i16_samples(&writer, data.iter().copied()),
-                    error_callback,
-                    None,
-                ),
-                SampleFormat::U16 => device.build_input_stream(
-                    &config.into(),
-                    move |data: &[u16], _| push_i16_samples(&writer, data.iter().map(|sample| *sample as i32 - 32768).map(|sample| sample as i16)),
-                    error_callback,
-                    None,
-                ),
-                SampleFormat::F32 => device.build_input_stream(
-                    &config.into(),
-                    move |data: &[f32], _| push_i16_samples(&writer, data.iter().map(|sample| (*sample * i16::MAX as f32) as i16)),
-                    error_callback,
-                    None,
-                ),
+                SampleFormat::I16 => {
+                    let writer = writer.clone();
+                    let on_level = on_level.clone();
+                    let last_level_emit = last_level_emit.clone();
+                    device.build_input_stream(
+                        &config.into(),
+                        move |data: &[i16], _| {
+                            push_i16_samples(&writer, data.iter().copied());
+                            emit_input_level(&on_level, &last_level_emit, data.iter().copied());
+                        },
+                        error_callback,
+                        None,
+                    )
+                }
+                SampleFormat::U16 => {
+                    let writer = writer.clone();
+                    let on_level = on_level.clone();
+                    let last_level_emit = last_level_emit.clone();
+                    device.build_input_stream(
+                        &config.into(),
+                        move |data: &[u16], _| {
+                            let converted = data
+                                .iter()
+                                .map(|sample| *sample as i32 - 32768)
+                                .map(|sample| sample as i16)
+                                .collect::<Vec<_>>();
+                            push_i16_samples(&writer, converted.iter().copied());
+                            emit_input_level(&on_level, &last_level_emit, converted.into_iter());
+                        },
+                        error_callback,
+                        None,
+                    )
+                }
+                SampleFormat::F32 => {
+                    let writer = writer.clone();
+                    let on_level = on_level.clone();
+                    let last_level_emit = last_level_emit.clone();
+                    device.build_input_stream(
+                        &config.into(),
+                        move |data: &[f32], _| {
+                            let converted = data
+                                .iter()
+                                .map(|sample| (*sample * i16::MAX as f32) as i16)
+                                .collect::<Vec<_>>();
+                            push_i16_samples(&writer, converted.iter().copied());
+                            emit_input_level(&on_level, &last_level_emit, converted.into_iter());
+                        },
+                        error_callback,
+                        None,
+                    )
+                }
                 other => {
                     let _ = ready_tx.send(Err(format!("unsupported microphone sample format: {other:?}")));
                     return;
@@ -114,6 +150,43 @@ fn push_i16_samples(samples: &Arc<Mutex<Vec<i16>>>, incoming: impl Iterator<Item
     }
 }
 
+fn emit_input_level(
+    on_level: &Arc<impl Fn(f32) + Send + Sync + 'static>,
+    last_level_emit: &Arc<Mutex<Instant>>,
+    incoming: impl Iterator<Item = i16>,
+) {
+    let samples = incoming.collect::<Vec<_>>();
+    if samples.is_empty() {
+        return;
+    }
+
+    let Ok(mut last_emit) = last_level_emit.lock() else {
+        return;
+    };
+    if last_emit.elapsed() < Duration::from_millis(70) {
+        return;
+    }
+    *last_emit = Instant::now();
+
+    on_level(normalized_rms_level(&samples));
+}
+
+fn normalized_rms_level(samples: &[i16]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+
+    let mean_square = samples
+        .iter()
+        .map(|sample| {
+            let normalized = *sample as f32 / i16::MAX as f32;
+            normalized * normalized
+        })
+        .sum::<f32>()
+        / samples.len() as f32;
+    mean_square.sqrt().powf(0.65).clamp(0.0, 1.0)
+}
+
 pub fn resample_to_16khz(audio: &RecordedAudio) -> RecordedAudio {
     if audio.sample_rate == 16_000 || audio.pcm.is_empty() {
         return audio.clone();
@@ -164,5 +237,20 @@ mod tests {
         assert_eq!(resampled.sample_rate, 16_000);
         assert_eq!(resampled.pcm.len(), 16);
         assert_eq!(resampled.pcm[1], 3);
+    }
+
+    #[test]
+    fn normalized_rms_level_is_zero_for_silence() {
+        assert_eq!(normalized_rms_level(&[0, 0, 0, 0]), 0.0);
+    }
+
+    #[test]
+    fn normalized_rms_level_grows_with_louder_samples() {
+        let quiet = normalized_rms_level(&[300, -300, 300, -300]);
+        let loud = normalized_rms_level(&[8_000, -8_000, 8_000, -8_000]);
+
+        assert!(quiet > 0.0);
+        assert!(loud > quiet);
+        assert!(loud <= 1.0);
     }
 }

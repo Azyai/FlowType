@@ -86,7 +86,9 @@ export default function App() {
                   onClearHistory={shell.handleClearHistory}
                 />
               )}
-              {activePage === 'history' && <HistoryPage settings={settings} />}
+              {activePage === 'history' && (
+                <HistoryPage settings={settings} onClearHistory={shell.handleClearHistory} />
+              )}
               {activePage === 'about' && <AboutPage />}
 
               {activePage !== 'status' && activePage !== 'about' && (

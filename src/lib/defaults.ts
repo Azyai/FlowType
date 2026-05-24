@@ -1,4 +1,11 @@
-import type { AppSettings, AppStatus, AsrServiceCheckResult, AsrServiceConfig, DatabaseHealth } from '../types';
+import type {
+  AppSettings,
+  AppStatus,
+  AsrServiceCheckResult,
+  AsrServiceConfig,
+  DatabaseHealth,
+  TranscriptHistoryPage
+} from '../types';
 
 export const defaultSettings: AppSettings = {
   hotkey: 'Alt',
@@ -63,4 +70,11 @@ export const fallbackAsrServiceCheck: AsrServiceCheckResult = {
   message: 'ASR service status is only available inside the desktop app.',
   missing_fields: [],
   checked_at: new Date(0).toISOString()
+};
+
+export const fallbackTranscriptHistoryPage: TranscriptHistoryPage = {
+  items: [],
+  total: 0,
+  limit: 20,
+  offset: 0
 };
