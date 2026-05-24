@@ -11,7 +11,7 @@ import type {
 } from '../../types';
 
 const PAGE_SIZE = 20;
-const HISTORY_PREVIEW_LENGTH = 30;
+const HISTORY_PREVIEW_LENGTH = 20;
 
 export function HistoryPage({
   settings,
@@ -89,7 +89,7 @@ export function HistoryPage({
     setFeedback(null);
 
     try {
-      await navigator.clipboard.writeText(historyItemText(item));
+      await copyTextToClipboard(historyItemText(item));
       setFeedback({ kind: 'success', message: t('notice.historyItemCopied') });
     } catch (copyError) {
       setFeedback({ kind: 'error', message: readableError(copyError) });
@@ -256,4 +256,28 @@ function truncateHistoryText(text: string) {
     return chars.join('');
   }
   return `${chars.slice(0, HISTORY_PREVIEW_LENGTH).join('')}...`;
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('Copy command was rejected by the browser.');
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }

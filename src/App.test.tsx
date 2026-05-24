@@ -7,6 +7,7 @@ import * as bridge from './lib/tauri';
 import type { AppSettings } from './types';
 
 const writeText = vi.fn().mockResolvedValue(undefined);
+const execCommand = vi.fn().mockReturnValue(true);
 
 const settings: AppSettings = {
   hotkey: 'Ctrl+Alt+V',
@@ -46,6 +47,10 @@ describe('FlowType settings shell', () => {
     });
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText },
+      configurable: true
+    });
+    Object.defineProperty(document, 'execCommand', {
+      value: execCommand,
       configurable: true
     });
     vi.spyOn(bridge, 'getSettings').mockResolvedValue(settings);
@@ -109,6 +114,7 @@ describe('FlowType settings shell', () => {
     });
     vi.restoreAllMocks();
     writeText.mockClear();
+    execCommand.mockClear();
   });
 
   test('renders the hotkey page after loading native state', async () => {
@@ -199,13 +205,15 @@ describe('FlowType settings shell', () => {
 
   test('renders compact transcript history items and supports copy/delete actions', async () => {
     const user = userEvent.setup();
+    const historyText = 'this is a long final transcript that should be truncated in history view';
+    const expectedPreview = `${Array.from(historyText).slice(0, 30).join('')}...`;
     vi.mocked(bridge.getHistory)
       .mockResolvedValueOnce({
         items: [
           {
             id: 1,
             raw_text: 'raw transcript',
-            final_text: 'this is a long final transcript that should be truncated in history view',
+            final_text: historyText,
             output_style: 'raw',
             recognition_started_at: 1700000000,
             recognition_duration_ms: 820,
@@ -231,14 +239,18 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'History' }));
 
     expect(
-      await screen.findByText('this is a long final transcript...')
+      await screen.findByText(expectedPreview)
     ).toBeInTheDocument();
     expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(writeText).toHaveBeenCalledWith(
-      'this is a long final transcript that should be truncated in history view'
-    );
+    await waitFor(() => {
+      expect(
+        writeText.mock.calls.some(([value]) => value === historyText) ||
+          execCommand.mock.calls.some(([command]) => command === 'copy')
+      ).toBe(true);
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('History item copied');
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 

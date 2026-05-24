@@ -25,6 +25,11 @@ pub struct ClearHistoryResult {
     pub deleted_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct DeleteHistoryItemResult {
+    pub deleted_count: usize,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AsrServiceConfigInput {
     pub rtasr_app_id: String,
@@ -107,6 +112,11 @@ pub fn check_asr_service(state: State<AppState>) -> CommandResult<AsrServiceChec
 #[tauri::command]
 pub fn clear_history(state: State<AppState>) -> CommandResult<ClearHistoryResult> {
     into_command(state.clear_history().map(|deleted_count| ClearHistoryResult { deleted_count }))
+}
+
+#[tauri::command]
+pub fn delete_history_item(state: State<AppState>, id: i64) -> CommandResult<DeleteHistoryItemResult> {
+    into_command(state.delete_history_item(id).map(|deleted_count| DeleteHistoryItemResult { deleted_count }))
 }
 
 #[tauri::command]
