@@ -8,6 +8,7 @@ import '../styles/live-caption.css';
 const ACTIVE_STATUSES: AppStateStatus[] = ['Listening', 'Uploading', 'Recognizing', 'Injecting'];
 const HIDE_DELAY_MS = 900;
 const TYPE_INTERVAL_MS = 18;
+const CAPTION_TAIL_LENGTH = 20;
 
 export function LiveCaptionPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
@@ -36,19 +37,21 @@ export function LiveCaptionPage() {
       setStatus(nextStatus);
 
       if (partial) {
+        const nextText = formatCaptionText(partial);
         clearHideTimer(hideTimerRef);
         swallowAsync(window.show());
-        latestTextRef.current = partial;
-        setTargetText(partial);
+        latestTextRef.current = nextText;
+        setTargetText(nextText);
         setVisible(true);
         return;
       }
 
       if (finalText) {
+        const nextText = formatCaptionText(finalText);
         clearHideTimer(hideTimerRef);
         swallowAsync(window.show());
-        latestTextRef.current = finalText;
-        setTargetText(finalText);
+        latestTextRef.current = nextText;
+        setTargetText(nextText);
         setVisible(true);
         scheduleHide(hideTimerRef, () => {
           setVisible(false);
@@ -167,6 +170,14 @@ function sharedPrefixLength(left: string, right: string) {
     index += 1;
   }
   return index;
+}
+
+function formatCaptionText(text: string) {
+  const chars = Array.from(text.trim());
+  if (chars.length <= CAPTION_TAIL_LENGTH) {
+    return chars.join('');
+  }
+  return `...${chars.slice(-CAPTION_TAIL_LENGTH).join('')}`;
 }
 
 function swallowAsync(result: Promise<unknown> | unknown) {

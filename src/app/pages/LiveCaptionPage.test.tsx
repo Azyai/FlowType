@@ -123,6 +123,29 @@ describe('LiveCaptionPage', () => {
     expect(document.querySelector('.live-caption-shell')?.className).not.toContain('visible');
     expect(hideWindow).toHaveBeenCalled();
   });
+
+  test('shows only the latest 20 characters for long transcripts', async () => {
+    const longText = '这是一个很长很长的实时字幕内容用于测试最新二十字展示策略';
+    const expected = `...${Array.from(longText).slice(-20).join('')}`;
+
+    render(<LiveCaptionPage />);
+
+    await act(async () => {
+      voiceListener?.({
+        payload: {
+          status: 'Listening',
+          transcript_partial: longText,
+          transcript_final: null,
+          error_code: null,
+          message: null
+        }
+      });
+    });
+
+    await revealAllText(expected);
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
 });
 
 async function revealAllText(text: string) {
