@@ -38,3 +38,9 @@ urlencoding = "2"
 
 [dev-dependencies]
 pretty_assertions = "1"
+
+[profile.dev.build-override]
+debug-assertions = true
+
+[profile.release.build-override]
+debug-assertions = true
