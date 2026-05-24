@@ -1,5 +1,7 @@
 use crate::{
     app::AppState,
+    desktop::windows,
+    settings::AppSettings,
     voice::state::{VoiceStatus, VoiceTrigger},
 };
 use rdev::{listen, Event, EventType, Key};
@@ -80,6 +82,7 @@ pub fn start_hotkey_listener(app_handle: AppHandle) {
                             Ok(VoiceStatus::Idle | VoiceStatus::Success | VoiceStatus::Failed)
                         )
                     {
+                        show_live_caption_window_if_needed(&app_handle, &settings);
                         if state
                             .start_voice_input(&app_handle, &settings, VoiceTrigger::Hotkey)
                             .is_ok()
@@ -90,6 +93,9 @@ pub fn start_hotkey_listener(app_handle: AppHandle) {
 
                     if toggle_combo.matches(&pressed) && !toggle_latch {
                         toggle_latch = true;
+                        if !matches!(state.voice_status(), Ok(VoiceStatus::Listening)) {
+                            show_live_caption_window_if_needed(&app_handle, &settings);
+                        }
                         if let Err(error) = state.toggle_voice_input(
                             app_handle.clone(),
                             settings.clone(),
@@ -117,6 +123,12 @@ pub fn start_hotkey_listener(app_handle: AppHandle) {
             log::error!("global hotkey listener failed: {error:?}");
         }
     });
+}
+
+fn show_live_caption_window_if_needed(app_handle: &AppHandle, settings: &AppSettings) {
+    if settings.show_floating_window {
+        let _ = windows::spawn_live_caption_window(app_handle);
+    }
 }
 
 fn event_key(event_type: &EventType) -> Option<HotkeyKey> {

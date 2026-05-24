@@ -462,7 +462,7 @@ fn emit_level(app: &AppHandle, level: f32) {
 }
 
 fn should_enable_auto_stop(trigger: VoiceTrigger, settings: &AppSettings) -> bool {
-    !matches!(trigger, VoiceTrigger::Mascot) && settings.vad_enabled
+    !matches!(trigger, VoiceTrigger::Mascot | VoiceTrigger::HotkeyToggle) && settings.vad_enabled
 }
 
 #[cfg(test)]
@@ -474,6 +474,7 @@ mod tests {
         let settings = AppSettings::default();
 
         assert!(!should_enable_auto_stop(VoiceTrigger::Mascot, &settings));
+        assert!(!should_enable_auto_stop(VoiceTrigger::HotkeyToggle, &settings));
     }
 
     #[test]
