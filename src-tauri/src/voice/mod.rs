@@ -348,6 +348,10 @@ impl VoiceController {
             let _ = state.transition_voice(&app, VoiceStatus::Injecting);
             match inject::inject_text(&final_text, &settings.clipboard_restore) {
                 Ok(outcome) => {
+                    let history_error_summary = outcome
+                        .error_code
+                        .as_ref()
+                        .map(|_| outcome.message.as_str());
                     record_history_if_enabled(
                         &state,
                         &settings,
@@ -355,15 +359,17 @@ impl VoiceController {
                         &final_text,
                         &recognition_started_at,
                         recognition_duration_ms,
-                        matches!(outcome, inject::InjectionOutcome::Pasted),
-                        None,
-                        None,
+                        outcome.injected(),
+                        outcome.error_code.as_deref(),
+                        history_error_summary,
                     );
                     state.emit_voice_event(&app, VoiceSessionEvent::final_text(final_text));
+                    emit_text_injection_event(&app, outcome.into());
                     let _ = state.transition_voice(&app, VoiceStatus::Success);
                 }
-                Err(error) => {
-                    let message = error.to_string();
+                Err(failure) => {
+                    let code = failure.code.clone();
+                    let message = failure.message.clone();
                     record_history_if_enabled(
                         &state,
                         &settings,
@@ -372,10 +378,11 @@ impl VoiceController {
                         &recognition_started_at,
                         recognition_duration_ms,
                         false,
-                        Some("INJECT_FAILED"),
+                        Some(code.as_str()),
                         Some(message.as_str()),
                     );
-                    state.fail_voice(&app, "INJECT_FAILED", message);
+                    emit_text_injection_event(&app, failure.clone().into());
+                    state.fail_voice(&app, code.as_str(), message);
                 }
             }
         });
@@ -437,6 +444,12 @@ fn now_unix_seconds() -> i64 {
 
 fn elapsed_millis_i64(started_at: Instant) -> i64 {
     started_at.elapsed().as_millis().min(i64::MAX as u128) as i64
+}
+
+fn emit_text_injection_event(app: &AppHandle, event: inject::TextInjectionEvent) {
+    if let Err(error) = app.emit("text_injection_result", event) {
+        log::warn!("failed to emit text injection result: {error}");
+    }
 }
 
 fn emit_level(app: &AppHandle, level: f32) {

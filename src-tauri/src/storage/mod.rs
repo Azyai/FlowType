@@ -292,6 +292,7 @@ impl Database {
         Ok(deleted)
     }
 
+    #[cfg(test)]
     pub fn count_transcript_history(&self) -> AppResult<i64> {
         let connection = self.connection.lock().map_err(|_| crate::error::AppError::StateLock)?;
         let count = connection.query_row("SELECT COUNT(*) FROM transcript_history", [], |row| row.get(0))?;
