@@ -26,23 +26,6 @@ export function VoicePage({
 
       <div className="grid two-column-grid">
         <label className="field">
-          <span>{t('voice.appId')}</span>
-          <input
-            value={settings.rtasr_app_id}
-            aria-label={t('voice.appId')}
-            onChange={(event) => setSettings({ ...settings, rtasr_app_id: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          <span>{t('voice.apiKey')}</span>
-          <input
-            type="password"
-            value={settings.rtasr_api_key}
-            aria-label={t('voice.apiKey')}
-            onChange={(event) => setSettings({ ...settings, rtasr_api_key: event.target.value })}
-          />
-        </label>
-        <label className="field">
           <span>{t('voice.language')}</span>
           <select
             value={settings.rtasr_language}

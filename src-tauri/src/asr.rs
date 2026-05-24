@@ -3,6 +3,8 @@ use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const PROVIDER: &str = "xfyun_rtasr";
+const BUILTIN_RTASR_APP_ID: &str = "3a5a99a1";
+const BUILTIN_RTASR_API_KEY: &str = "64cc6bcce2383a37c3a6b61006a13ade";
 
 #[derive(Debug, Clone)]
 pub(crate) struct RtasrCredentials {
@@ -10,22 +12,17 @@ pub(crate) struct RtasrCredentials {
     pub api_key: String,
 }
 
-pub(crate) fn credentials_for(settings: &AppSettings) -> Option<RtasrCredentials> {
-    if settings.rtasr_app_id.trim().is_empty() || settings.rtasr_api_key.trim().is_empty() {
-        None
-    } else {
-        Some(RtasrCredentials {
-            app_id: settings.rtasr_app_id.trim().to_string(),
-            api_key: settings.rtasr_api_key.trim().to_string(),
-        })
-    }
+pub(crate) fn credentials_for(_settings: &AppSettings) -> Option<RtasrCredentials> {
+    Some(RtasrCredentials {
+        app_id: BUILTIN_RTASR_APP_ID.to_string(),
+        api_key: BUILTIN_RTASR_API_KEY.to_string(),
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AsrServiceStatusKind {
     Ready,
-    MissingConfig,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -49,37 +46,25 @@ pub struct AsrServiceCheckResult {
 pub fn service_config(settings: &AppSettings) -> AsrServiceConfig {
     AsrServiceConfig {
         provider: PROVIDER,
-        rtasr_app_id_masked: mask_secret(&settings.rtasr_app_id),
-        rtasr_api_key_masked: mask_secret(&settings.rtasr_api_key),
+        rtasr_app_id_masked: mask_secret(BUILTIN_RTASR_APP_ID),
+        rtasr_api_key_masked: mask_secret(BUILTIN_RTASR_API_KEY),
         language: settings.rtasr_language,
         timeout_ms: settings.rtasr_timeout_ms,
     }
 }
 
 pub fn check_service(settings: &AppSettings) -> AsrServiceCheckResult {
-    let missing_fields = missing_fields(settings);
-    if missing_fields.is_empty() {
-        AsrServiceCheckResult {
-            status: AsrServiceStatusKind::Ready,
-            provider: PROVIDER,
-            message: asr_message(&settings.locale_preference, AsrMessage::Ready),
-            missing_fields: vec![],
-            checked_at: now_string(),
-        }
-    } else {
-        AsrServiceCheckResult {
-            status: AsrServiceStatusKind::MissingConfig,
-            provider: PROVIDER,
-            message: asr_message(&settings.locale_preference, AsrMessage::MissingConfig),
-            missing_fields,
-            checked_at: now_string(),
-        }
+    AsrServiceCheckResult {
+        status: AsrServiceStatusKind::Ready,
+        provider: PROVIDER,
+        message: asr_message(&settings.locale_preference, AsrMessage::Ready),
+        missing_fields: vec![],
+        checked_at: now_string(),
     }
 }
 
 enum AsrMessage {
     Ready,
-    MissingConfig,
 }
 
 fn asr_message(preference: &LocalePreference, message: AsrMessage) -> String {
@@ -95,22 +80,9 @@ fn asr_message(preference: &LocalePreference, message: AsrMessage) -> String {
     let text = match (use_zh, message) {
         (true, AsrMessage::Ready) => "实时转写 RTASR 凭据已配置完整。",
         (false, AsrMessage::Ready) => "RTASR credentials are configured.",
-        (true, AsrMessage::MissingConfig) => "实时转写 RTASR 凭据不完整。",
-        (false, AsrMessage::MissingConfig) => "RTASR credentials are incomplete.",
     };
 
     text.to_string()
-}
-
-fn missing_fields(settings: &AppSettings) -> Vec<&'static str> {
-    let mut missing = Vec::new();
-    if settings.rtasr_app_id.trim().is_empty() {
-        missing.push("app_id");
-    }
-    if settings.rtasr_api_key.trim().is_empty() {
-        missing.push("api_key");
-    }
-    missing
 }
 
 fn mask_secret(value: &str) -> String {
@@ -143,55 +115,36 @@ mod tests {
 
     #[test]
     fn config_returns_only_masked_credentials() {
-        let mut settings = AppSettings::default();
-        settings.rtasr_app_id = "appid123456".to_string();
-        settings.rtasr_api_key = "apikey123456".to_string();
+        let settings = AppSettings::default();
 
         let config = service_config(&settings);
         let debug_text = format!("{config:?}");
 
-        assert_eq!(config.rtasr_app_id_masked, "appi***3456");
-        assert_eq!(config.rtasr_api_key_masked, "apik***3456");
-        assert!(!debug_text.contains("appid123456"));
-        assert!(!debug_text.contains("apikey123456"));
+        assert_eq!(config.rtasr_app_id_masked, "***");
+        assert_eq!(config.rtasr_api_key_masked, "64cc***3ade");
+        assert!(!debug_text.contains(BUILTIN_RTASR_APP_ID));
+        assert!(!debug_text.contains(BUILTIN_RTASR_API_KEY));
     }
 
     #[test]
-    fn credentials_are_available_when_required_fields_exist() {
-        let mut settings = AppSettings::default();
-        settings.rtasr_app_id = "appid123456".to_string();
-        settings.rtasr_api_key = "apikey123456".to_string();
+    fn credentials_always_use_builtin_values() {
+        let settings = AppSettings::default();
 
         let credentials = credentials_for(&settings).unwrap();
 
-        assert_eq!(credentials.app_id, "appid123456");
-        assert_eq!(credentials.api_key, "apikey123456");
+        assert_eq!(credentials.app_id, BUILTIN_RTASR_APP_ID);
+        assert_eq!(credentials.api_key, BUILTIN_RTASR_API_KEY);
     }
 
     #[test]
-    fn service_reports_ready_when_credentials_exist() {
+    fn service_reports_ready_with_builtin_credentials() {
         let mut settings = AppSettings::default();
         settings.locale_preference = LocalePreference::ZhCn;
-        settings.rtasr_app_id = "appid".to_string();
-        settings.rtasr_api_key = "apikey".to_string();
 
         let status = check_service(&settings);
 
         assert_eq!(status.status, AsrServiceStatusKind::Ready);
         assert_eq!(status.message, "实时转写 RTASR 凭据已配置完整。");
         assert!(status.missing_fields.is_empty());
-    }
-
-    #[test]
-    fn service_reports_missing_fields() {
-        let mut settings = AppSettings::default();
-        settings.locale_preference = LocalePreference::ZhCn;
-        settings.rtasr_app_id = "appid".to_string();
-
-        let status = check_service(&settings);
-
-        assert_eq!(status.status, AsrServiceStatusKind::MissingConfig);
-        assert_eq!(status.message, "实时转写 RTASR 凭据不完整。");
-        assert_eq!(status.missing_fields, vec!["api_key"]);
     }
 }

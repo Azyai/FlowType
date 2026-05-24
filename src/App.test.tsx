@@ -7,9 +7,9 @@ import * as bridge from './lib/tauri';
 import type { AppSettings } from './types';
 
 const settings: AppSettings = {
-  hotkey: 'Alt',
+  hotkey: 'Ctrl+Alt+V',
   input_mode: 'hold_to_talk',
-  toggle_hotkey: 'Ctrl+Shift+Space',
+  toggle_hotkey: 'Ctrl+Alt+M',
   rtasr_app_id: '',
   rtasr_api_key: '',
   rtasr_language: 'zh_cn',

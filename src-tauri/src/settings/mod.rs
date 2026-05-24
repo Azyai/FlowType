@@ -14,7 +14,7 @@ pub enum InputMode {
 }
 
 fn default_hotkey() -> String {
-    "Alt".to_string()
+    "Ctrl+Alt+V".to_string()
 }
 
 fn default_input_mode() -> InputMode {
@@ -22,7 +22,7 @@ fn default_input_mode() -> InputMode {
 }
 
 fn default_toggle_hotkey() -> String {
-    "Ctrl+Shift+Space".to_string()
+    "Ctrl+Alt+M".to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -298,9 +298,9 @@ mod tests {
     fn default_settings_match_phase_zero_defaults() {
         let settings = AppSettings::default();
 
-        assert_eq!(settings.hotkey, "Alt");
+        assert_eq!(settings.hotkey, "Ctrl+Alt+V");
         assert_eq!(settings.input_mode, InputMode::HoldToTalk);
-        assert_eq!(settings.toggle_hotkey, "Ctrl+Shift+Space");
+        assert_eq!(settings.toggle_hotkey, "Ctrl+Alt+M");
         assert_eq!(settings.rtasr_language, RtasrLanguage::ZhCn);
         assert_eq!(settings.rtasr_timeout_ms, 10_000);
         assert_eq!(settings.output_style, OutputStyle::Raw);
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(loaded.rtasr_timeout_ms, 8_000);
         assert_eq!(loaded.output_style, OutputStyle::Clean);
         assert_eq!(loaded.clipboard_restore, ClipboardRestore::Never);
-        assert_eq!(loaded.toggle_hotkey, "Ctrl+Shift+Space");
+        assert_eq!(loaded.toggle_hotkey, "Ctrl+Alt+M");
         assert_eq!(loaded.history_retention_days, 14);
         assert_eq!(loaded.min_recording_ms, 500);
         assert_eq!(loaded.max_recording_ms, 60_000);
@@ -379,7 +379,7 @@ mod tests {
         let store = ConfigStore::new(&path);
         let mut settings = AppSettings::default();
         settings.hotkey = "Ctrl+Space".to_string();
-        settings.toggle_hotkey = "Ctrl+Shift+Space".to_string();
+        settings.toggle_hotkey = "Ctrl+Alt+M".to_string();
         settings.auto_start = true;
         settings.update_channel = UpdateChannel::Beta;
 
@@ -433,6 +433,6 @@ mod tests {
         let loaded = store.load().unwrap();
 
         assert_eq!(loaded.toggle_hotkey, "Alt");
-        assert_eq!(loaded.hotkey, "Ctrl+Shift+Space");
+        assert_eq!(loaded.hotkey, "Ctrl+Alt+V");
     }
 }

@@ -8,9 +8,9 @@ import type {
 } from '../types';
 
 export const defaultSettings: AppSettings = {
-  hotkey: 'Alt',
+  hotkey: 'Ctrl+Alt+V',
   input_mode: 'hold_to_talk',
-  toggle_hotkey: 'Ctrl+Shift+Space',
+  toggle_hotkey: 'Ctrl+Alt+M',
   rtasr_app_id: '',
   rtasr_api_key: '',
   rtasr_language: 'zh_cn',

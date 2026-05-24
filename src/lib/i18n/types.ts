@@ -56,8 +56,6 @@ export type TranslationKey =
   | 'voice.provider'
   | 'voice.realtimeOnly'
   | 'voice.realtimeNote'
-  | 'voice.appId'
-  | 'voice.apiKey'
   | 'voice.language'
   | 'voice.languageZhCn'
   | 'voice.languageEnUs'
