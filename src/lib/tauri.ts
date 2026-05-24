@@ -76,14 +76,10 @@ export function getAsrServiceConfig(): Promise<AsrServiceConfig> {
 
 export function saveAsrServiceConfig(config: Pick<
   AppSettings,
-  | 'asr_service_mode'
-  | 'iflytek_app_id'
-  | 'iflytek_api_key'
-  | 'iflytek_api_secret'
-  | 'iflytek_language'
-  | 'iflytek_mixed_language'
-  | 'iflytek_timeout_ms'
-  | 'iflytek_retry_count'
+  | 'rtasr_app_id'
+  | 'rtasr_api_key'
+  | 'rtasr_language'
+  | 'rtasr_timeout_ms'
 >): Promise<AppSettings> {
   return nativeInvoke('save_asr_service_config', { config }, { ...defaultSettings, ...config });
 }
@@ -112,7 +108,17 @@ export function startVoiceInput(trigger: VoiceTrigger): Promise<VoiceSessionEven
 
 export function stopVoiceInput(trigger: VoiceTrigger): Promise<VoiceSessionEvent> {
   return nativeInvoke('stop_voice_input', { trigger }, {
-    status: 'Uploading',
+    status: 'Recognizing',
+    transcript_partial: null,
+    transcript_final: null,
+    error_code: null,
+    message: null
+  });
+}
+
+export function toggleRecording(): Promise<VoiceSessionEvent> {
+  return nativeInvoke('toggle_recording', undefined, {
+    status: 'Listening',
     transcript_partial: null,
     transcript_final: null,
     error_code: null,

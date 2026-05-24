@@ -51,17 +51,18 @@ describe('MascotPage', () => {
     voiceLevelListener = null;
   });
 
-  test('starts and stops voice input from double click using the shared state machine commands', async () => {
+  test('starts and stops voice input from single click using the shared state machine commands', async () => {
     const user = userEvent.setup();
-    vi.spyOn(bridge, 'startVoiceInput').mockResolvedValue({
+    const toggleRecording = vi.spyOn(bridge, 'toggleRecording');
+    toggleRecording.mockResolvedValueOnce({
       status: 'Listening',
       transcript_partial: null,
       transcript_final: null,
       error_code: null,
       message: null
     });
-    vi.spyOn(bridge, 'stopVoiceInput').mockResolvedValue({
-      status: 'Uploading',
+    toggleRecording.mockResolvedValueOnce({
+      status: 'Recognizing',
       transcript_partial: null,
       transcript_final: null,
       error_code: null,
@@ -70,7 +71,7 @@ describe('MascotPage', () => {
 
     render(<MascotPage />);
     const mascot = screen.getByRole('button', { name: 'FlowType voice mascot' });
-    await user.dblClick(mascot);
+    await user.click(mascot);
     await act(async () => {
       voiceListener?.({
         payload: {
@@ -82,13 +83,33 @@ describe('MascotPage', () => {
         }
       });
     });
-    await user.dblClick(mascot);
+    await new Promise((resolve) => setTimeout(resolve, 260));
+    await user.click(mascot);
 
-    expect(bridge.startVoiceInput).toHaveBeenCalledWith('mascot');
-    expect(bridge.stopVoiceInput).toHaveBeenCalledWith('mascot');
+    expect(toggleRecording).toHaveBeenCalledTimes(2);
   });
 
-  test('renders live transcript from voice status events and opens right click menu', async () => {
+  test('ignores duplicate single clicks that arrive within the guard window', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Date, 'now').mockReturnValueOnce(2_000).mockReturnValueOnce(2_080);
+    const toggleRecording = vi.spyOn(bridge, 'toggleRecording').mockResolvedValue({
+      status: 'Listening',
+      transcript_partial: null,
+      transcript_final: null,
+      error_code: null,
+      message: null
+    });
+
+    render(<MascotPage />);
+    const mascot = screen.getByRole('button', { name: 'FlowType voice mascot' });
+
+    await user.click(mascot);
+    await user.click(mascot);
+
+    expect(toggleRecording).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps listening style while showing live partial transcript and opens right click menu', async () => {
     const user = userEvent.setup();
     vi.spyOn(bridge, 'openSettingsWindow').mockResolvedValue(undefined);
     vi.spyOn(bridge, 'hideMascotWindow').mockResolvedValue(undefined);
@@ -107,7 +128,7 @@ describe('MascotPage', () => {
       voiceLevelListener?.({ payload: 0.72 });
       voiceListener?.({
         payload: {
-          status: 'Recognizing',
+          status: 'Listening',
           transcript_partial: 'hello world',
           transcript_final: null,
           error_code: null,
@@ -117,7 +138,8 @@ describe('MascotPage', () => {
     });
 
     expect(await screen.findByText('hello world')).toBeInTheDocument();
-    expect(container.querySelector('.mascot-ripple')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'FlowType voice mascot' })).toHaveClass('listening');
+    expect(container.querySelector('.mascot-ripple')).toBeInTheDocument();
     await user.pointer({ keys: '[MouseRight]', target: screen.getByRole('button', { name: 'FlowType voice mascot' }) });
 
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeInTheDocument();

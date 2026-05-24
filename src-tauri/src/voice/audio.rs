@@ -3,24 +3,19 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat,
 };
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-#[derive(Debug, Clone)]
-pub struct RecordedAudio {
-    pub pcm: Vec<i16>,
-    pub sample_rate: u32,
-}
 
 pub struct AudioRecorder {
     stop_tx: Option<Sender<()>>,
-    samples: Arc<Mutex<Vec<i16>>>,
-    sample_rate: u32,
 }
 
 impl AudioRecorder {
-    pub fn start(on_level: impl Fn(f32) + Send + Sync + 'static) -> AppResult<Self> {
+    pub fn start(
+        on_level: impl Fn(f32) + Send + Sync + 'static,
+        on_samples: impl Fn(Vec<i16>, u32) + Send + Sync + 'static,
+    ) -> AppResult<Self> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
@@ -29,9 +24,9 @@ impl AudioRecorder {
             .default_input_config()
             .map_err(|error| AppError::Audio(error.to_string()))?;
         let sample_rate = config.sample_rate().0;
-        let samples = Arc::new(Mutex::new(Vec::new()));
-        let writer = samples.clone();
+        let channel_count = config.channels() as usize;
         let on_level = Arc::new(on_level);
+        let on_samples = Arc::new(on_samples);
         let last_level_emit = Arc::new(Mutex::new(Instant::now().checked_sub(Duration::from_millis(80)).unwrap_or_else(Instant::now)));
         
         let (stop_tx, stop_rx) = channel::<()>();
@@ -42,22 +37,23 @@ impl AudioRecorder {
             
             let stream_result = match config.sample_format() {
                 SampleFormat::I16 => {
-                    let writer = writer.clone();
                     let on_level = on_level.clone();
+                    let on_samples = on_samples.clone();
                     let last_level_emit = last_level_emit.clone();
                     device.build_input_stream(
                         &config.into(),
                         move |data: &[i16], _| {
-                            push_i16_samples(&writer, data.iter().copied());
-                            emit_input_level(&on_level, &last_level_emit, data.iter().copied());
+                            let mono = interleaved_to_mono_i16(data, channel_count);
+                            emit_input_level(&on_level, &last_level_emit, mono.iter().copied());
+                            on_samples(mono, sample_rate);
                         },
                         error_callback,
                         None,
                     )
                 }
                 SampleFormat::U16 => {
-                    let writer = writer.clone();
                     let on_level = on_level.clone();
+                    let on_samples = on_samples.clone();
                     let last_level_emit = last_level_emit.clone();
                     device.build_input_stream(
                         &config.into(),
@@ -67,16 +63,17 @@ impl AudioRecorder {
                                 .map(|sample| *sample as i32 - 32768)
                                 .map(|sample| sample as i16)
                                 .collect::<Vec<_>>();
-                            push_i16_samples(&writer, converted.iter().copied());
-                            emit_input_level(&on_level, &last_level_emit, converted.into_iter());
+                            let mono = interleaved_to_mono_i16(&converted, channel_count);
+                            emit_input_level(&on_level, &last_level_emit, mono.iter().copied());
+                            on_samples(mono, sample_rate);
                         },
                         error_callback,
                         None,
                     )
                 }
                 SampleFormat::F32 => {
-                    let writer = writer.clone();
                     let on_level = on_level.clone();
+                    let on_samples = on_samples.clone();
                     let last_level_emit = last_level_emit.clone();
                     device.build_input_stream(
                         &config.into(),
@@ -85,8 +82,9 @@ impl AudioRecorder {
                                 .iter()
                                 .map(|sample| (*sample * i16::MAX as f32) as i16)
                                 .collect::<Vec<_>>();
-                            push_i16_samples(&writer, converted.iter().copied());
-                            emit_input_level(&on_level, &last_level_emit, converted.into_iter());
+                            let mono = interleaved_to_mono_i16(&converted, channel_count);
+                            emit_input_level(&on_level, &last_level_emit, mono.iter().copied());
+                            on_samples(mono, sample_rate);
                         },
                         error_callback,
                         None,
@@ -123,8 +121,6 @@ impl AudioRecorder {
             Ok(Ok(())) => {
                 Ok(Self {
                     stop_tx: Some(stop_tx),
-                    samples,
-                    sample_rate,
                 })
             }
             Ok(Err(msg)) => Err(AppError::Audio(msg)),
@@ -132,22 +128,25 @@ impl AudioRecorder {
         }
     }
 
-    pub fn stop(mut self) -> RecordedAudio {
+    pub fn stop(mut self) {
         if let Some(tx) = self.stop_tx.take() {
             let _ = tx.send(());
-        }
-        let pcm = self.samples.lock().map(|samples| samples.clone()).unwrap_or_default();
-        RecordedAudio {
-            pcm,
-            sample_rate: self.sample_rate,
         }
     }
 }
 
-fn push_i16_samples(samples: &Arc<Mutex<Vec<i16>>>, incoming: impl Iterator<Item = i16>) {
-    if let Ok(mut buffer) = samples.lock() {
-        buffer.extend(incoming);
+fn interleaved_to_mono_i16(samples: &[i16], channel_count: usize) -> Vec<i16> {
+    if channel_count <= 1 || samples.is_empty() {
+        return samples.to_vec();
     }
+
+    samples
+        .chunks(channel_count)
+        .map(|frame| {
+            let sum = frame.iter().map(|sample| *sample as i32).sum::<i32>();
+            (sum / frame.len() as i32) as i16
+        })
+        .collect()
 }
 
 fn emit_input_level(
@@ -186,58 +185,9 @@ fn normalized_rms_level(samples: &[i16]) -> f32 {
         / samples.len() as f32;
     mean_square.sqrt().powf(0.65).clamp(0.0, 1.0)
 }
-
-pub fn resample_to_16khz(audio: &RecordedAudio) -> RecordedAudio {
-    if audio.sample_rate == 16_000 || audio.pcm.is_empty() {
-        return audio.clone();
-    }
-
-    let ratio = audio.sample_rate as f64 / 16_000.0;
-    let target_len = (audio.pcm.len() as f64 / ratio).ceil() as usize;
-    let mut pcm = Vec::with_capacity(target_len);
-    for index in 0..target_len {
-        let source_index = (index as f64 * ratio).floor() as usize;
-        if let Some(sample) = audio.pcm.get(source_index) {
-            pcm.push(*sample);
-        }
-    }
-
-    RecordedAudio {
-        pcm,
-        sample_rate: 16_000,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn resample_to_16khz_keeps_16khz_audio_unchanged() {
-        let audio = RecordedAudio {
-            pcm: vec![1, 2, 3],
-            sample_rate: 16_000,
-        };
-
-        let resampled = resample_to_16khz(&audio);
-
-        assert_eq!(resampled.sample_rate, 16_000);
-        assert_eq!(resampled.pcm, vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn resample_to_16khz_downsamples_by_position() {
-        let audio = RecordedAudio {
-            pcm: (0..48).collect(),
-            sample_rate: 48_000,
-        };
-
-        let resampled = resample_to_16khz(&audio);
-
-        assert_eq!(resampled.sample_rate, 16_000);
-        assert_eq!(resampled.pcm.len(), 16);
-        assert_eq!(resampled.pcm[1], 3);
-    }
 
     #[test]
     fn normalized_rms_level_is_zero_for_silence() {
@@ -252,5 +202,19 @@ mod tests {
         assert!(quiet > 0.0);
         assert!(loud > quiet);
         assert!(loud <= 1.0);
+    }
+
+    #[test]
+    fn mono_conversion_keeps_single_channel_audio() {
+        let samples = vec![1, -2, 3, -4];
+
+        assert_eq!(interleaved_to_mono_i16(&samples, 1), samples);
+    }
+
+    #[test]
+    fn mono_conversion_averages_interleaved_frames() {
+        let stereo = [1000, 3000, -2000, 2000, 500, 1500];
+
+        assert_eq!(interleaved_to_mono_i16(&stereo, 2), vec![2000, 0, 1000]);
     }
 }

@@ -10,14 +10,10 @@ import type {
 export const defaultSettings: AppSettings = {
   hotkey: 'Alt',
   input_mode: 'hold_to_talk',
-  asr_service_mode: 'built_in',
-  iflytek_app_id: '',
-  iflytek_api_key: '',
-  iflytek_api_secret: '',
-  iflytek_language: 'zh_cn',
-  iflytek_mixed_language: true,
-  iflytek_timeout_ms: 10000,
-  iflytek_retry_count: 1,
+  rtasr_app_id: '',
+  rtasr_api_key: '',
+  rtasr_language: 'zh_cn',
+  rtasr_timeout_ms: 10000,
   output_style: 'raw',
   clipboard_restore: 'always',
   floating_window_position: 'bottom_right',
@@ -52,21 +48,16 @@ export const fallbackDatabaseHealth: DatabaseHealth = {
 };
 
 export const fallbackAsrServiceConfig: AsrServiceConfig = {
-  provider: 'iflytek',
-  service_mode: defaultSettings.asr_service_mode,
-  iflytek_app_id_masked: '',
-  iflytek_api_key_masked: '',
-  iflytek_api_secret_configured: false,
-  language: defaultSettings.iflytek_language,
-  mixed_language: defaultSettings.iflytek_mixed_language,
-  timeout_ms: defaultSettings.iflytek_timeout_ms,
-  retry_count: defaultSettings.iflytek_retry_count
+  provider: 'xfyun_rtasr',
+  rtasr_app_id_masked: '',
+  rtasr_api_key_masked: '',
+  language: defaultSettings.rtasr_language,
+  timeout_ms: defaultSettings.rtasr_timeout_ms
 };
 
 export const fallbackAsrServiceCheck: AsrServiceCheckResult = {
   status: 'missing_config',
-  provider: 'iflytek',
-  service_mode: 'built_in',
+  provider: 'xfyun_rtasr',
   message: 'ASR service status is only available inside the desktop app.',
   missing_fields: [],
   checked_at: new Date(0).toISOString()

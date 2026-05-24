@@ -27,14 +27,10 @@ pub struct ClearHistoryResult {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AsrServiceConfigInput {
-    pub asr_service_mode: crate::settings::AsrServiceMode,
-    pub iflytek_app_id: String,
-    pub iflytek_api_key: String,
-    pub iflytek_api_secret: String,
-    pub iflytek_language: crate::settings::IflytekLanguage,
-    pub iflytek_mixed_language: bool,
-    pub iflytek_timeout_ms: u64,
-    pub iflytek_retry_count: u8,
+    pub rtasr_app_id: String,
+    pub rtasr_api_key: String,
+    pub rtasr_language: crate::settings::RtasrLanguage,
+    pub rtasr_timeout_ms: u64,
 }
 
 #[tauri::command]
@@ -248,14 +244,10 @@ fn save_asr_config_and_refresh_tray(
     config: AsrServiceConfigInput,
 ) -> AppResult<AppSettings> {
     let mut settings = state.settings()?;
-    settings.asr_service_mode = config.asr_service_mode;
-    settings.iflytek_app_id = config.iflytek_app_id;
-    settings.iflytek_api_key = config.iflytek_api_key;
-    settings.iflytek_api_secret = config.iflytek_api_secret;
-    settings.iflytek_language = config.iflytek_language;
-    settings.iflytek_mixed_language = config.iflytek_mixed_language;
-    settings.iflytek_timeout_ms = config.iflytek_timeout_ms;
-    settings.iflytek_retry_count = config.iflytek_retry_count;
+    settings.rtasr_app_id = config.rtasr_app_id;
+    settings.rtasr_api_key = config.rtasr_api_key;
+    settings.rtasr_language = config.rtasr_language;
+    settings.rtasr_timeout_ms = config.rtasr_timeout_ms;
     save_settings_and_refresh_tray(app, state, settings)
 }
 

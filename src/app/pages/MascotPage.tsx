@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import type { AppStateStatus, VoiceSessionEvent } from '../../types';
-import { getSettings, hideMascotWindow, openSettingsWindow, setOutputMode, startVoiceInput, stopVoiceInput } from '../../lib/tauri';
+import { getSettings, hideMascotWindow, openSettingsWindow, setOutputMode, toggleRecording } from '../../lib/tauri';
 import '../styles/mascot.css';
 
 import { Menu } from '@tauri-apps/api/menu';
@@ -11,6 +11,7 @@ import { translate } from '../../lib/i18n/I18nContext';
 import { resolveLocale } from '../../lib/i18n/locale';
 
 const ACTIVE_STATUSES: AppStateStatus[] = ['Listening', 'Uploading', 'Recognizing'];
+const TOGGLE_GUARD_MS = 220;
 
 export function MascotPage() {
   const [status, setStatus] = useState<AppStateStatus>('Idle');
@@ -18,6 +19,8 @@ export function MascotPage() {
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [locale, setLocale] = useState(resolveLocale('auto'));
   const dragMoved = useRef(false);
+  const isToggling = useRef(false);
+  const lastToggleAt = useRef(0);
 
   const t = useCallback((key: any) => translate(locale, key), [locale]);
 
@@ -88,14 +91,28 @@ export function MascotPage() {
     window.addEventListener('mouseup', onMouseUp);
   }
 
-  async function handleDoubleClick() {
-    if (dragMoved.current) return;
-    if (ACTIVE_STATUSES.includes(status)) {
-      await stopVoiceInput('mascot');
-    } else {
-      setPartial('');
-      await startVoiceInput('mascot');
+  async function handleToggleClick() {
+    const now = Date.now();
+    if (isToggling.current || now - lastToggleAt.current < TOGGLE_GUARD_MS) {
+      return;
     }
+    isToggling.current = true;
+    lastToggleAt.current = now;
+    try {
+      if (!ACTIVE_STATUSES.includes(status)) {
+        setPartial('');
+      }
+      await toggleRecording();
+    } finally {
+      isToggling.current = false;
+    }
+  }
+
+  function handleMouseUp(event: React.MouseEvent) {
+    if (event.button !== 0 || dragMoved.current) {
+      return;
+    }
+    void handleToggleClick();
   }
 
   async function handleContextMenu(event: React.MouseEvent) {
@@ -160,7 +177,7 @@ export function MascotPage() {
         aria-label="FlowType voice mascot"
         className={`mascot-avatar ${status.toLowerCase()}`}
         onMouseDown={handleMouseDown}
-        onDoubleClick={handleDoubleClick}
+        onMouseUp={handleMouseUp}
       >
         <span className="mascot-face" aria-hidden="true">
           <span className="mascot-eyes blink" />

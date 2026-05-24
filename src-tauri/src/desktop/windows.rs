@@ -1,6 +1,9 @@
 use crate::error::{AppError, AppResult};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+const MASCOT_WINDOW_SIZE: f64 = 80.0;
+const MASCOT_WINDOW_MARGIN: f64 = 40.0;
+
 pub fn show_main_window(app: &AppHandle) -> AppResult<()> {
     let Some(window) = app.get_webview_window("main") else {
         return Err(AppError::Window("main window is not registered".to_string()));
@@ -21,7 +24,7 @@ pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
 
     let window = WebviewWindowBuilder::new(app, "mascot", WebviewUrl::App("/?window=mascot".into()))
         .title("FlowType Mascot")
-        .inner_size(80.0, 80.0)
+        .inner_size(MASCOT_WINDOW_SIZE, MASCOT_WINDOW_SIZE)
         .resizable(false)
         .transparent(true)
         .decorations(false)
@@ -38,8 +41,8 @@ pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
         let logical_width = (size.width as f64) / scale_factor;
         let logical_height = (size.height as f64) / scale_factor;
         
-        let x = logical_width - 80.0 - 40.0;
-        let y = logical_height - 80.0 - 40.0;
+        let x = logical_width - MASCOT_WINDOW_SIZE - MASCOT_WINDOW_MARGIN;
+        let y = logical_height - MASCOT_WINDOW_SIZE - MASCOT_WINDOW_MARGIN;
         let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
     }
 

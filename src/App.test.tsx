@@ -9,14 +9,10 @@ import type { AppSettings } from './types';
 const settings: AppSettings = {
   hotkey: 'Alt',
   input_mode: 'hold_to_talk',
-  asr_service_mode: 'built_in',
-  iflytek_app_id: '',
-  iflytek_api_key: '',
-  iflytek_api_secret: '',
-  iflytek_language: 'zh_cn',
-  iflytek_mixed_language: true,
-  iflytek_timeout_ms: 10000,
-  iflytek_retry_count: 1,
+  rtasr_app_id: '',
+  rtasr_api_key: '',
+  rtasr_language: 'zh_cn',
+  rtasr_timeout_ms: 10000,
   output_style: 'raw',
   clipboard_restore: 'always',
   floating_window_position: 'bottom_right',
@@ -70,9 +66,8 @@ describe('FlowType settings shell', () => {
     vi.spyOn(bridge, 'setAutostart').mockResolvedValue(settings);
     vi.spyOn(bridge, 'checkAsrService').mockResolvedValue({
       status: 'ready',
-      provider: 'iflytek',
-      service_mode: 'built_in',
-      message: 'Built-in iFlytek service is configured for the recognition flow.',
+      provider: 'xfyun_rtasr',
+      message: 'RTASR credentials are configured.',
       missing_fields: [],
       checked_at: '0'
     });
@@ -161,39 +156,35 @@ describe('FlowType settings shell', () => {
     });
   });
 
-  test('shows iFlytek ASR service status without local model options', async () => {
+  test('shows RTASR service status without short dictation options', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Status' });
     await user.click(screen.getByRole('button', { name: 'ASR Service' }));
 
-    expect(screen.getByText('Provider: iFlytek')).toBeInTheDocument();
-    expect(screen.getByText('Built-in service account')).toBeInTheDocument();
-    expect(screen.getByText(/audio is uploaded to iFlytek/i)).toBeInTheDocument();
+    expect(screen.getByText('Provider: iFlytek RTASR')).toBeInTheDocument();
+    expect(screen.getByText('Realtime transcription only')).toBeInTheDocument();
+    expect(screen.getByText(/streamed to iFlytek RTASR/i)).toBeInTheDocument();
     expect(screen.queryByText('Local first')).not.toBeInTheDocument();
     expect(screen.queryByText('Default model')).not.toBeInTheDocument();
   });
 
-  test('saves custom development iFlytek credentials through settings', async () => {
+  test('saves RTASR credentials through settings', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Status' });
     await user.click(screen.getByRole('button', { name: 'ASR Service' }));
-    await user.selectOptions(screen.getByLabelText('Service mode'), 'custom_dev');
-    await user.type(screen.getByLabelText('iFlytek AppID'), 'test-app-id');
-    await user.type(screen.getByLabelText('iFlytek API Key'), 'test-api-key');
-    await user.type(screen.getByLabelText('iFlytek API Secret'), 'test-api-secret');
+    await user.type(screen.getByLabelText('RTASR AppID'), 'test-app-id');
+    await user.type(screen.getByLabelText('RTASR API Key'), 'test-api-key');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
-          asr_service_mode: 'custom_dev',
-          iflytek_app_id: 'test-app-id',
-          iflytek_api_key: 'test-api-key',
-          iflytek_api_secret: 'test-api-secret'
+          rtasr_app_id: 'test-app-id',
+          rtasr_api_key: 'test-api-key'
         })
       );
     });
@@ -294,8 +285,7 @@ describe('FlowType settings shell', () => {
   });
 
   test('shows global feedback as a top toast and hides it after three seconds', async () => {
-    vi.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Status' });
@@ -304,10 +294,8 @@ describe('FlowType settings shell', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Settings saved');
 
-    vi.advanceTimersByTime(3000);
-
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    });
+    }, { timeout: 4000 });
   });
 });

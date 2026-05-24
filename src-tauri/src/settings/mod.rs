@@ -15,37 +15,18 @@ pub enum InputMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AsrServiceMode {
-    BuiltIn,
-    CustomDev,
-}
-
-fn default_asr_service_mode() -> AsrServiceMode {
-    AsrServiceMode::BuiltIn
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IflytekLanguage {
+pub enum RtasrLanguage {
     ZhCn,
     EnUs,
     ZhEn,
 }
 
-fn default_iflytek_language() -> IflytekLanguage {
-    IflytekLanguage::ZhCn
+fn default_rtasr_language() -> RtasrLanguage {
+    RtasrLanguage::ZhCn
 }
 
-fn default_iflytek_mixed_language() -> bool {
-    true
-}
-
-fn default_iflytek_timeout_ms() -> u64 {
+fn default_rtasr_timeout_ms() -> u64 {
     10_000
-}
-
-fn default_iflytek_retry_count() -> u8 {
-    1
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,22 +95,14 @@ fn default_max_recording_ms() -> u64 {
 pub struct AppSettings {
     pub hotkey: String,
     pub input_mode: InputMode,
-    #[serde(default = "default_asr_service_mode")]
-    pub asr_service_mode: AsrServiceMode,
-    #[serde(default)]
-    pub iflytek_app_id: String,
-    #[serde(default)]
-    pub iflytek_api_key: String,
-    #[serde(default)]
-    pub iflytek_api_secret: String,
-    #[serde(default = "default_iflytek_language")]
-    pub iflytek_language: IflytekLanguage,
-    #[serde(default = "default_iflytek_mixed_language")]
-    pub iflytek_mixed_language: bool,
-    #[serde(default = "default_iflytek_timeout_ms")]
-    pub iflytek_timeout_ms: u64,
-    #[serde(default = "default_iflytek_retry_count")]
-    pub iflytek_retry_count: u8,
+    #[serde(default, alias = "iflytek_app_id")]
+    pub rtasr_app_id: String,
+    #[serde(default, alias = "iflytek_api_key")]
+    pub rtasr_api_key: String,
+    #[serde(default = "default_rtasr_language", alias = "iflytek_language")]
+    pub rtasr_language: RtasrLanguage,
+    #[serde(default = "default_rtasr_timeout_ms", alias = "iflytek_timeout_ms")]
+    pub rtasr_timeout_ms: u64,
     pub output_style: OutputStyle,
     pub clipboard_restore: ClipboardRestore,
     pub floating_window_position: FloatingWindowPosition,
@@ -163,14 +136,10 @@ impl Default for AppSettings {
         Self {
             hotkey: "Alt".to_string(),
             input_mode: InputMode::HoldToTalk,
-            asr_service_mode: AsrServiceMode::BuiltIn,
-            iflytek_app_id: String::new(),
-            iflytek_api_key: String::new(),
-            iflytek_api_secret: String::new(),
-            iflytek_language: IflytekLanguage::ZhCn,
-            iflytek_mixed_language: true,
-            iflytek_timeout_ms: 10_000,
-            iflytek_retry_count: 1,
+            rtasr_app_id: String::new(),
+            rtasr_api_key: String::new(),
+            rtasr_language: RtasrLanguage::ZhCn,
+            rtasr_timeout_ms: 10_000,
             output_style: OutputStyle::Raw,
             clipboard_restore: ClipboardRestore::Always,
             floating_window_position: FloatingWindowPosition::BottomRight,
@@ -271,11 +240,8 @@ mod tests {
 
         assert_eq!(settings.hotkey, "Alt");
         assert_eq!(settings.input_mode, InputMode::HoldToTalk);
-        assert_eq!(settings.asr_service_mode, AsrServiceMode::BuiltIn);
-        assert_eq!(settings.iflytek_language, IflytekLanguage::ZhCn);
-        assert!(settings.iflytek_mixed_language);
-        assert_eq!(settings.iflytek_timeout_ms, 10_000);
-        assert_eq!(settings.iflytek_retry_count, 1);
+        assert_eq!(settings.rtasr_language, RtasrLanguage::ZhCn);
+        assert_eq!(settings.rtasr_timeout_ms, 10_000);
         assert_eq!(settings.output_style, OutputStyle::Raw);
         assert_eq!(settings.clipboard_restore, ClipboardRestore::Always);
         assert_eq!(settings.floating_window_position, FloatingWindowPosition::BottomRight);
@@ -296,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn old_settings_load_with_iflytek_defaults() {
+    fn old_settings_load_with_rtasr_aliases() {
         let path = test_path("legacy");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
@@ -304,8 +270,10 @@ mod tests {
             r#"{
               "hotkey": "Alt",
               "input_mode": "hold_to_talk",
-              "asr_mode": "local_first",
-              "default_model": "whisper-small-q8",
+              "iflytek_app_id": "legacy-app-id",
+              "iflytek_api_key": "legacy-api-key",
+              "iflytek_language": "zh_en",
+              "iflytek_timeout_ms": 8000,
               "output_style": "clean",
               "clipboard_restore": "always",
               "floating_window_position": "bottom_right",
@@ -321,10 +289,12 @@ mod tests {
 
         let loaded = store.load().unwrap();
 
-        assert_eq!(loaded.asr_service_mode, AsrServiceMode::BuiltIn);
+        assert_eq!(loaded.rtasr_app_id, "legacy-app-id");
+        assert_eq!(loaded.rtasr_api_key, "legacy-api-key");
+        assert_eq!(loaded.rtasr_language, RtasrLanguage::ZhEn);
+        assert_eq!(loaded.rtasr_timeout_ms, 8_000);
         assert_eq!(loaded.output_style, OutputStyle::Clean);
         assert_eq!(loaded.history_retention_days, 14);
-        assert_eq!(loaded.iflytek_api_secret, "");
         assert_eq!(loaded.min_recording_ms, 500);
         assert_eq!(loaded.max_recording_ms, 60_000);
     }

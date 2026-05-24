@@ -55,9 +55,9 @@ impl VoiceSessionEvent {
         }
     }
 
-    pub fn partial(text: impl Into<String>) -> Self {
+    pub fn partial_with_status(status: VoiceStatus, text: impl Into<String>) -> Self {
         Self {
-            status: VoiceStatus::Recognizing,
+            status,
             transcript_partial: Some(text.into()),
             transcript_final: None,
             error_code: None,
@@ -88,7 +88,6 @@ impl VoiceSessionEvent {
 
 #[derive(Debug, Clone)]
 pub struct ActiveVoiceSession {
-    pub trigger: VoiceTrigger,
     pub started_at: Instant,
 }
 
@@ -112,14 +111,13 @@ impl VoiceStateMachine {
         self.status
     }
 
-    pub fn start(&mut self, trigger: VoiceTrigger) -> AppResult<VoiceSessionEvent> {
+    pub fn start(&mut self, _trigger: VoiceTrigger) -> AppResult<VoiceSessionEvent> {
         if matches!(self.status, VoiceStatus::Listening | VoiceStatus::Uploading | VoiceStatus::Recognizing | VoiceStatus::Injecting) {
             return Err(AppError::Voice("voice input is already active".to_string()));
         }
 
         self.status = VoiceStatus::Listening;
         self.active = Some(ActiveVoiceSession {
-            trigger,
             started_at: Instant::now(),
         });
         Ok(VoiceSessionEvent::status(VoiceStatus::Listening))
@@ -139,7 +137,7 @@ impl VoiceStateMachine {
             });
         }
 
-        self.status = VoiceStatus::Uploading;
+        self.status = VoiceStatus::Recognizing;
         Ok(StopDecision::Process { elapsed_ms })
     }
 
@@ -212,6 +210,14 @@ mod tests {
         let decision = machine.stop(&settings).unwrap();
 
         assert!(matches!(decision, StopDecision::Process { .. }));
-        assert_eq!(machine.status(), VoiceStatus::Uploading);
+        assert_eq!(machine.status(), VoiceStatus::Recognizing);
+    }
+
+    #[test]
+    fn partial_event_can_preserve_processing_status() {
+        let event = VoiceSessionEvent::partial_with_status(VoiceStatus::Recognizing, "hello");
+
+        assert_eq!(event.status, VoiceStatus::Recognizing);
+        assert_eq!(event.transcript_partial.as_deref(), Some("hello"));
     }
 }
