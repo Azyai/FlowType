@@ -13,15 +13,26 @@ import type {
 const PAGE_SIZE = 20;
 const HISTORY_PREVIEW_LENGTH = 20;
 
+function confirmAction(message: string) {
+  if (typeof window.confirm !== 'function') {
+    return true;
+  }
+
+  return window.confirm(message);
+}
+
 export function HistoryPage({
   settings,
-  onClearHistory
+  onClearHistory,
+  onToast,
+  onSummaryChange
 }: {
   settings: AppSettings;
-  onClearHistory: () => Promise<void> | void;
+  onClearHistory: () => Promise<{ deleted_count: number } | null> | { deleted_count: number } | null;
+  onToast: (kind: 'success' | 'error', message: string) => void;
+  onSummaryChange: (summary: { total: number; enabled: boolean; retentionDays: number }) => void;
 }) {
   const { locale, t } = useI18n();
-  const status = settings.save_history ? t('history.enabled') : t('history.disabled');
   const [historyPage, setHistoryPage] = useState<TranscriptHistoryPageResult>({
     items: [],
     total: 0,
@@ -32,7 +43,6 @@ export function HistoryPage({
   const [clearing, setClearing] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
   const loadHistory = useCallback(async (offset = 0, append = false) => {
     setLoading(true);
@@ -59,12 +69,21 @@ export function HistoryPage({
     void loadHistory();
   }, [loadHistory]);
 
+  useEffect(() => {
+    onSummaryChange({
+      total: historyPage.total,
+      enabled: settings.save_history,
+      retentionDays: settings.history_retention_days
+    });
+  }, [historyPage.total, onSummaryChange, settings.history_retention_days, settings.save_history]);
+
   async function handleClearHistory() {
     setClearing(true);
-    setFeedback(null);
     try {
-      await onClearHistory();
-      await loadHistory();
+      const result = await onClearHistory();
+      if (result) {
+        await loadHistory();
+      }
     } finally {
       setClearing(false);
     }
@@ -86,19 +105,20 @@ export function HistoryPage({
   }
 
   async function handleCopyHistoryItem(item: TranscriptHistoryItem) {
-    setFeedback(null);
-
     try {
       await copyTextToClipboard(historyItemText(item));
-      setFeedback({ kind: 'success', message: t('notice.historyItemCopied') });
+      onToast('success', t('notice.historyItemCopied'));
     } catch (copyError) {
-      setFeedback({ kind: 'error', message: readableError(copyError) });
+      onToast('error', readableError(copyError));
     }
   }
 
   async function handleDeleteHistoryItem(id: number) {
+    if (!confirmAction(t('history.confirmDelete'))) {
+      return;
+    }
+
     setDeletingId(id);
-    setFeedback(null);
 
     try {
       const result = await deleteHistoryItem(id);
@@ -108,10 +128,10 @@ export function HistoryPage({
             ? Math.max(0, historyPage.offset - PAGE_SIZE)
             : historyPage.offset;
         await loadHistory(nextOffset);
-        setFeedback({ kind: 'success', message: t('notice.historyItemDeleted') });
+        onToast('success', t('notice.historyItemDeleted'));
       }
     } catch (deleteError) {
-      setFeedback({ kind: 'error', message: readableError(deleteError) });
+      onToast('error', readableError(deleteError));
     } finally {
       setDeletingId(null);
     }
@@ -121,15 +141,6 @@ export function HistoryPage({
 
   return (
     <section className="panel history-panel">
-      <div className="service-summary">
-        <strong>{t('history.total', { count: historyPage.total })}</strong>
-        <span>{status}</span>
-      </div>
-      <p className="muted">
-        {t('history.storage', { status })} {t('history.retention', { days: settings.history_retention_days })}
-      </p>
-      <p className="muted">{t('history.textOnly')}</p>
-
       <div className="history-actions">
         <button
           type="button"
@@ -152,15 +163,6 @@ export function HistoryPage({
       {error && (
         <div className="inline-result danger" role="alert">
           {error}
-        </div>
-      )}
-
-      {feedback && (
-        <div
-          className={`inline-result${feedback.kind === 'error' ? ' danger' : ''}`}
-          role={feedback.kind === 'error' ? 'alert' : 'status'}
-        >
-          {feedback.message}
         </div>
       )}
 

@@ -6,9 +6,6 @@ import App from './App';
 import * as bridge from './lib/tauri';
 import type { AppSettings } from './types';
 
-const writeText = vi.fn().mockResolvedValue(undefined);
-const execCommand = vi.fn().mockReturnValue(true);
-
 const settings: AppSettings = {
   hotkey: 'Ctrl+Alt+V',
   input_mode: 'hold_to_talk',
@@ -38,19 +35,20 @@ const settings: AppSettings = {
 
 describe('FlowType settings shell', () => {
   const originalLanguage = navigator.language;
+  const originalClipboard = navigator.clipboard;
+  const originalConfirm = window.confirm;
 
   beforeEach(() => {
     vi.useRealTimers();
+    window.confirm = vi.fn(() => true);
     Object.defineProperty(navigator, 'language', {
       value: 'en-US',
       configurable: true
     });
     Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText },
-      configurable: true
-    });
-    Object.defineProperty(document, 'execCommand', {
-      value: execCommand,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined)
+      },
       configurable: true
     });
     vi.spyOn(bridge, 'getSettings').mockResolvedValue(settings);
@@ -108,13 +106,16 @@ describe('FlowType settings shell', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    window.confirm = originalConfirm;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: originalClipboard,
+      configurable: true
+    });
     Object.defineProperty(navigator, 'language', {
       value: originalLanguage,
       configurable: true
     });
     vi.restoreAllMocks();
-    writeText.mockClear();
-    execCommand.mockClear();
   });
 
   test('renders the hotkey page after loading native state', async () => {
@@ -189,10 +190,17 @@ describe('FlowType settings shell', () => {
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
     await user.click(screen.getByRole('button', { name: 'Clear history' }));
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith('Clear all history records?');
+      expect(bridge.clearHistory).toHaveBeenCalled();
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent('History cleared, 0 records removed');
+
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
-      expect(bridge.clearHistory).toHaveBeenCalled();
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           output_style: 'formal',
@@ -203,10 +211,9 @@ describe('FlowType settings shell', () => {
     });
   });
 
-  test('renders compact transcript history items and supports copy/delete actions', async () => {
+  test('renders compact transcript history items and supports copy/delete actions with toast feedback', async () => {
     const user = userEvent.setup();
     const historyText = 'this is a long final transcript that should be truncated in history view';
-    const expectedPreview = `${Array.from(historyText).slice(0, 30).join('')}...`;
     vi.mocked(bridge.getHistory)
       .mockResolvedValueOnce({
         items: [
@@ -238,26 +245,26 @@ describe('FlowType settings shell', () => {
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'History' }));
 
-    expect(
-      await screen.findByText(expectedPreview)
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(await screen.findByText('1 records')).toBeInTheDocument();
+    expect(screen.getByText('History is enabled')).toBeInTheDocument();
+    expect(screen.getByText('Retention: 14 days')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
+    expect(screen.getByText('this is a long final transcrip...')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Copy' }));
-    await waitFor(() => {
-      expect(
-        writeText.mock.calls.some(([value]) => value === historyText) ||
-          execCommand.mock.calls.some(([command]) => command === 'copy')
-      ).toBe(true);
-    });
     expect(await screen.findByRole('status')).toHaveTextContent('History item copied');
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith('Delete this history record?');
       expect(bridge.deleteHistoryItem).toHaveBeenCalledWith(1);
       expect(bridge.getHistory).toHaveBeenCalledTimes(2);
     });
+
+    expect(await screen.findByRole('status')).toHaveTextContent('History item deleted');
   });
 
   test('toggles autostart through the native bridge', async () => {

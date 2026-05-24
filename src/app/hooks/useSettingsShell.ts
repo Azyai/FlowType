@@ -14,11 +14,19 @@ import {
 import { readableError } from '../../lib/formatters/errors';
 import { resolveLocale } from '../../lib/i18n/locale';
 import { translate } from '../../lib/i18n/I18nContext';
-import type { AppSettings, AppStatus, UpdateCheckResult } from '../../types';
+import type { AppSettings, AppStatus, ClearHistoryResult, UpdateCheckResult } from '../../types';
 
 export interface ToastState {
   kind: 'success' | 'error';
   message: string;
+}
+
+function confirmAction(message: string) {
+  if (typeof window.confirm !== 'function') {
+    return true;
+  }
+
+  return window.confirm(message);
 }
 
 export function useSettingsShell() {
@@ -135,12 +143,18 @@ export function useSettingsShell() {
     }
   }
 
-  async function handleClearHistory() {
+  async function handleClearHistory(): Promise<ClearHistoryResult | null> {
+    if (!confirmAction(t('history.confirmClear'))) {
+      return null;
+    }
+
     try {
       const result = await clearHistory();
       showToast('success', t('notice.historyCleared', { count: result.deleted_count }));
+      return result;
     } catch (historyError) {
       showToast('error', readableError(historyError));
+      throw historyError;
     }
   }
 
@@ -157,6 +171,7 @@ export function useSettingsShell() {
     setActivePage,
     setSettings,
     settings,
+    showToast,
     status,
     t,
     toast,

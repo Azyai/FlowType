@@ -15,7 +15,7 @@ export function AdvancedPage({
   updateResult: UpdateCheckResult | null;
   onCheckUpdate: () => void;
   onAutostart: (enabled: boolean) => void;
-  onClearHistory: () => void;
+  onClearHistory: () => Promise<unknown> | unknown;
 }) {
   const { t } = useI18n();
 

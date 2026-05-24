@@ -170,6 +170,31 @@ nav {
   margin-bottom: 30px;
 }
 
+.content-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 14px;
+}
+
+.content-title-row h1 {
+  margin: 0;
+}
+
+.content-title-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.content-title-meta span {
+  white-space: nowrap;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: #7a8190;
@@ -219,5 +244,9 @@ nav {
 
   .content-header {
     display: grid;
+  }
+
+  .content-title-row {
+    align-items: flex-start;
   }
 }

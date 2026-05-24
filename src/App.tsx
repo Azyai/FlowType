@@ -1,4 +1,5 @@
 import { Activity } from 'lucide-react';
+import { useState } from 'react';
 
 import { DesktopTitlebar } from './app/components/DesktopTitlebar';
 import { FormActions } from './app/components/FormActions';
@@ -19,6 +20,11 @@ export default function App() {
   const windowKind = new URLSearchParams(window.location.search).get('window');
   const isMascot = windowKind === 'mascot';
   const isLiveCaption = windowKind === 'live-caption';
+  const [historySummary, setHistorySummary] = useState<{
+    total: number;
+    enabled: boolean;
+    retentionDays: number;
+  } | null>(null);
 
   if (isMascot) {
     return <MascotPage />;
@@ -58,7 +64,25 @@ export default function App() {
           <DesktopTitlebar />
 
           <section className="content">
-            <PageHeader title={activeTitle} version={status.app_version} />
+            <PageHeader
+              title={activeTitle}
+              version={status.app_version}
+              meta={
+                activePage === 'history' && historySummary ? (
+                  <div className="content-title-meta muted">
+                    <span>{shell.t('history.total', { count: historySummary.total })}</span>
+                    <span>
+                      {shell.t('history.storageShort', {
+                        status: historySummary.enabled
+                          ? shell.t('history.enabled')
+                          : shell.t('history.disabled')
+                      })}
+                    </span>
+                    <span>{shell.t('history.retentionShort', { days: historySummary.retentionDays })}</span>
+                  </div>
+                ) : null
+              }
+            />
 
             <form onSubmit={shell.handleSave}>
               {activePage === 'hotkey' && <HotkeyPage settings={settings} setSettings={shell.setSettings} />}
@@ -73,7 +97,12 @@ export default function App() {
                 />
               )}
               {activePage === 'history' && (
-                <HistoryPage settings={settings} onClearHistory={shell.handleClearHistory} />
+                <HistoryPage
+                  settings={settings}
+                  onClearHistory={shell.handleClearHistory}
+                  onToast={shell.showToast}
+                  onSummaryChange={setHistorySummary}
+                />
               )}
               {activePage === 'about' && <AboutPage />}
 
