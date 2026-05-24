@@ -13,6 +13,7 @@ export type VoiceTrigger = 'hotkey' | 'mascot' | 'tray';
 export interface AppSettings {
   hotkey: string;
   input_mode: InputMode;
+  toggle_hotkey: string;
   rtasr_app_id: string;
   rtasr_api_key: string;
   rtasr_language: RtasrLanguage;

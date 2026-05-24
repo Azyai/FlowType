@@ -21,6 +21,7 @@ pub enum VoiceStatus {
 #[serde(rename_all = "snake_case")]
 pub enum VoiceTrigger {
     Hotkey,
+    HotkeyToggle,
     Mascot,
     Tray,
 }

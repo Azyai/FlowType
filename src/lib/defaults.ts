@@ -10,6 +10,7 @@ import type {
 export const defaultSettings: AppSettings = {
   hotkey: 'Alt',
   input_mode: 'hold_to_talk',
+  toggle_hotkey: 'Ctrl+Shift+Space',
   rtasr_app_id: '',
   rtasr_api_key: '',
   rtasr_language: 'zh_cn',

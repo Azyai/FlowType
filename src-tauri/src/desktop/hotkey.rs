@@ -1,6 +1,5 @@
 use crate::{
     app::AppState,
-    settings::InputMode,
     voice::state::{VoiceStatus, VoiceTrigger},
 };
 use rdev::{listen, Event, EventType, Key};
@@ -68,39 +67,45 @@ pub fn start_hotkey_listener(app_handle: AppHandle) {
                     return;
                 }
             };
-            let combo = HotkeyCombo::parse(&settings.hotkey);
+            let hold_combo = HotkeyCombo::parse(&settings.hotkey);
+            let toggle_combo = HotkeyCombo::parse(&settings.toggle_hotkey);
 
             match event.event_type {
                 EventType::KeyPress(_) => {
                     pressed.insert(key);
-                    let is_match = combo.matches(&pressed);
-                    match settings.input_mode {
-                        InputMode::HoldToTalk if is_match && !hold_active => {
+                    if hold_combo.matches(&pressed)
+                        && !hold_active
+                        && matches!(
+                            state.voice_status(),
+                            Ok(VoiceStatus::Idle | VoiceStatus::Success | VoiceStatus::Failed)
+                        )
+                    {
+                        if state
+                            .start_voice_input(&app_handle, &settings, VoiceTrigger::Hotkey)
+                            .is_ok()
+                        {
                             hold_active = true;
-                            let _ = state.start_voice_input(&app_handle, &settings, VoiceTrigger::Hotkey);
                         }
-                        InputMode::Toggle if is_match && !toggle_latch => {
-                            toggle_latch = true;
-                            match state.voice_status() {
-                                Ok(VoiceStatus::Listening) => {
-                                    let _ = state.stop_voice_input(app_handle.clone(), settings.clone(), VoiceTrigger::Hotkey);
-                                }
-                                Ok(_) => {
-                                    let _ = state.start_voice_input(&app_handle, &settings, VoiceTrigger::Hotkey);
-                                }
-                                Err(error) => log::warn!("failed to read voice status: {error}"),
-                            }
+                    }
+
+                    if toggle_combo.matches(&pressed) && !toggle_latch {
+                        toggle_latch = true;
+                        if let Err(error) = state.toggle_voice_input(
+                            app_handle.clone(),
+                            settings.clone(),
+                            VoiceTrigger::HotkeyToggle,
+                        ) {
+                            log::warn!("failed to toggle voice input from hotkey: {error}");
                         }
-                        _ => {}
                     }
                 }
                 EventType::KeyRelease(_) => {
                     pressed.remove(&key);
-                    if matches!(settings.input_mode, InputMode::HoldToTalk) && hold_active && combo.contains(key) {
+                    if hold_active && hold_combo.contains(key) && !hold_combo.matches(&pressed) {
                         hold_active = false;
                         let _ = state.stop_voice_input(app_handle.clone(), settings.clone(), VoiceTrigger::Hotkey);
                     }
-                    if matches!(settings.input_mode, InputMode::Toggle) && !combo.matches(&pressed) {
+                    if !toggle_combo.matches(&pressed) {
                         toggle_latch = false;
                     }
                 }

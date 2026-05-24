@@ -2,7 +2,7 @@ use crate::{
     asr::{self, AsrServiceCheckResult, AsrServiceConfig},
     settings::{AppSettings, OutputStyle},
     storage::{DatabaseHealth, TranscriptHistoryPage},
-    voice::state::{VoiceSessionEvent, VoiceStatus, VoiceTrigger},
+    voice::state::{VoiceSessionEvent, VoiceTrigger},
     error::{AppError, AppResult, CommandResult, ErrorResponse},
     app::AppState,
     updates::{self, UpdateCheckResult},
@@ -35,12 +35,11 @@ pub struct AsrServiceConfigInput {
 
 #[tauri::command]
 pub fn toggle_recording(app: AppHandle, state: State<AppState>) -> CommandResult<VoiceSessionEvent> {
-    let status = state.voice_status().map_err(error_response)?;
-    if status == VoiceStatus::Listening {
-        stop_voice_input(app, state, VoiceTrigger::Mascot)
-    } else {
-        start_voice_input(app, state, VoiceTrigger::Mascot)
+    let settings = state.settings().map_err(error_response)?;
+    if settings.show_floating_window {
+        let _ = windows::spawn_live_caption_window(&app);
     }
+    into_command(state.toggle_voice_input(app, settings, VoiceTrigger::Mascot))
 }
 
 #[tauri::command]

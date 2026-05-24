@@ -9,6 +9,7 @@ import type { AppSettings } from './types';
 const settings: AppSettings = {
   hotkey: 'Alt',
   input_mode: 'hold_to_talk',
+  toggle_hotkey: 'Ctrl+Shift+Space',
   rtasr_app_id: '',
   rtasr_api_key: '',
   rtasr_language: 'zh_cn',
@@ -108,6 +109,7 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByRole('heading', { name: 'Hotkey' })).toBeInTheDocument();
     expect(screen.getByText('Version 0.1.0')).toBeInTheDocument();
     expect(screen.getByLabelText('Hold-to-talk hotkey')).toBeInTheDocument();
+    expect(screen.getByLabelText('Toggle recording hotkey')).toBeInTheDocument();
   });
 
   test('shows only user-facing settings pages in navigation', async () => {
@@ -141,11 +143,13 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
     await user.click(screen.getByLabelText('Hold-to-talk hotkey'));
     await user.keyboard('{Control>}{Space}{/Control}');
+    await user.click(screen.getByLabelText('Toggle recording hotkey'));
+    await user.keyboard('{Control>}{Shift>}{KeyT}{/Shift}{/Control}');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ hotkey: 'Ctrl+Space' })
+        expect.objectContaining({ hotkey: 'Ctrl+Space', toggle_hotkey: 'Ctrl+Shift+T' })
       );
     });
   });

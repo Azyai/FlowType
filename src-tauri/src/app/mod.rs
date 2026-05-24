@@ -91,6 +91,19 @@ impl AppState {
         self.voice.stop(app, settings, trigger)
     }
 
+    pub fn toggle_voice_input(
+        &self,
+        app: tauri::AppHandle,
+        settings: AppSettings,
+        trigger: VoiceTrigger,
+    ) -> AppResult<VoiceSessionEvent> {
+        if self.voice_status()? == VoiceStatus::Listening {
+            self.stop_voice_input(app, settings, trigger)
+        } else {
+            self.start_voice_input(&app, &settings, trigger)
+        }
+    }
+
     pub fn cancel_voice_input(&self, app: &tauri::AppHandle) -> AppResult<VoiceSessionEvent> {
         self.voice.cancel(app)
     }

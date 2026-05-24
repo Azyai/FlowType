@@ -13,6 +13,18 @@ pub enum InputMode {
     Toggle,
 }
 
+fn default_hotkey() -> String {
+    "Alt".to_string()
+}
+
+fn default_input_mode() -> InputMode {
+    InputMode::HoldToTalk
+}
+
+fn default_toggle_hotkey() -> String {
+    "Ctrl+Shift+Space".to_string()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RtasrLanguage {
@@ -93,8 +105,12 @@ fn default_max_recording_ms() -> u64 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSettings {
+    #[serde(default = "default_hotkey")]
     pub hotkey: String,
+    #[serde(default = "default_input_mode")]
     pub input_mode: InputMode,
+    #[serde(default = "default_toggle_hotkey")]
+    pub toggle_hotkey: String,
     #[serde(default, alias = "iflytek_app_id")]
     pub rtasr_app_id: String,
     #[serde(default, alias = "iflytek_api_key")]
@@ -134,8 +150,9 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            hotkey: "Alt".to_string(),
+            hotkey: default_hotkey(),
             input_mode: InputMode::HoldToTalk,
+            toggle_hotkey: default_toggle_hotkey(),
             rtasr_app_id: String::new(),
             rtasr_api_key: String::new(),
             rtasr_language: RtasrLanguage::ZhCn,
@@ -179,9 +196,11 @@ impl ConfigStore {
         }
 
         let text = fs::read_to_string(&self.path)?;
+        let has_toggle_hotkey = text.contains("\"toggle_hotkey\"");
         match serde_json::from_str::<AppSettings>(&text) {
             Ok(mut settings) => {
                 settings.clipboard_restore = ClipboardRestore::Never;
+                normalize_hotkeys(&mut settings, has_toggle_hotkey);
                 Ok(settings)
             }
             Err(_) => {
@@ -224,6 +243,44 @@ impl ConfigStore {
     }
 }
 
+fn normalize_hotkeys(settings: &mut AppSettings, has_toggle_hotkey: bool) {
+    let migrated_legacy_toggle = !has_toggle_hotkey && matches!(settings.input_mode, InputMode::Toggle);
+
+    if settings.hotkey.trim().is_empty() {
+        settings.hotkey = default_hotkey();
+    }
+
+    if settings.toggle_hotkey.trim().is_empty() || migrated_legacy_toggle {
+        settings.toggle_hotkey = if migrated_legacy_toggle {
+            settings.hotkey.clone()
+        } else {
+            default_toggle_hotkey()
+        };
+    }
+
+    if same_hotkey(&settings.hotkey, &settings.toggle_hotkey) {
+        if migrated_legacy_toggle {
+            settings.hotkey = if same_hotkey(&default_hotkey(), &settings.toggle_hotkey) {
+                default_toggle_hotkey()
+            } else {
+                default_hotkey()
+            };
+        } else {
+            settings.toggle_hotkey = if same_hotkey(&default_toggle_hotkey(), &settings.hotkey) {
+                default_hotkey()
+            } else {
+                default_toggle_hotkey()
+            };
+        }
+    }
+}
+
+fn same_hotkey(left: &str, right: &str) -> bool {
+    let left = left.trim();
+    let right = right.trim();
+    !left.is_empty() && left.eq_ignore_ascii_case(right)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,6 +300,7 @@ mod tests {
 
         assert_eq!(settings.hotkey, "Alt");
         assert_eq!(settings.input_mode, InputMode::HoldToTalk);
+        assert_eq!(settings.toggle_hotkey, "Ctrl+Shift+Space");
         assert_eq!(settings.rtasr_language, RtasrLanguage::ZhCn);
         assert_eq!(settings.rtasr_timeout_ms, 10_000);
         assert_eq!(settings.output_style, OutputStyle::Raw);
@@ -298,6 +356,7 @@ mod tests {
         assert_eq!(loaded.rtasr_timeout_ms, 8_000);
         assert_eq!(loaded.output_style, OutputStyle::Clean);
         assert_eq!(loaded.clipboard_restore, ClipboardRestore::Never);
+        assert_eq!(loaded.toggle_hotkey, "Ctrl+Shift+Space");
         assert_eq!(loaded.history_retention_days, 14);
         assert_eq!(loaded.min_recording_ms, 500);
         assert_eq!(loaded.max_recording_ms, 60_000);
@@ -320,6 +379,7 @@ mod tests {
         let store = ConfigStore::new(&path);
         let mut settings = AppSettings::default();
         settings.hotkey = "Ctrl+Space".to_string();
+        settings.toggle_hotkey = "Ctrl+Shift+Space".to_string();
         settings.auto_start = true;
         settings.update_channel = UpdateChannel::Beta;
 
@@ -346,5 +406,33 @@ mod tests {
         assert_eq!(loaded, AppSettings::default());
         assert_eq!(corrupt_files, 1);
         assert!(path.exists());
+    }
+
+    #[test]
+    fn old_toggle_only_settings_migrate_to_dual_hotkeys() {
+        let path = test_path("legacy-toggle-hotkey");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{
+              "hotkey": "Alt",
+              "input_mode": "toggle",
+              "output_style": "raw",
+              "clipboard_restore": "never",
+              "floating_window_position": "bottom_right",
+              "save_history": true,
+              "auto_start": false,
+              "update_channel": "stable",
+              "update_manifest_url": "mock://updates/stable.json",
+              "auto_check_update": false
+            }"#,
+        )
+        .unwrap();
+        let store = ConfigStore::new(&path);
+
+        let loaded = store.load().unwrap();
+
+        assert_eq!(loaded.toggle_hotkey, "Alt");
+        assert_eq!(loaded.hotkey, "Ctrl+Shift+Space");
     }
 }
