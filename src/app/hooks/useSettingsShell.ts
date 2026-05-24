@@ -3,11 +3,9 @@ import { listen } from '@tauri-apps/api/event';
 
 import { PageId, pageTitleKey } from '../config/navigation';
 import {
-  checkAsrService,
   checkUpdate,
   clearHistory,
   getAppStatus,
-  getDatabaseHealth,
   getSettings,
   resetSettings,
   saveSettings,
@@ -16,7 +14,7 @@ import {
 import { readableError } from '../../lib/formatters/errors';
 import { resolveLocale } from '../../lib/i18n/locale';
 import { translate } from '../../lib/i18n/I18nContext';
-import type { AppSettings, AppStatus, AsrServiceCheckResult, DatabaseHealth, UpdateCheckResult } from '../../types';
+import type { AppSettings, AppStatus, UpdateCheckResult } from '../../types';
 
 export interface ToastState {
   kind: 'success' | 'error';
@@ -24,12 +22,10 @@ export interface ToastState {
 }
 
 export function useSettingsShell() {
-  const [activePage, setActivePage] = useState<PageId>('status');
+  const [activePage, setActivePage] = useState<PageId>('hotkey');
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
-  const [databaseHealth, setDatabaseHealth] = useState<DatabaseHealth | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
-  const [asrResult, setAsrResult] = useState<AsrServiceCheckResult | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
@@ -37,16 +33,14 @@ export function useSettingsShell() {
 
     async function load() {
       try {
-        const [loadedSettings, loadedStatus, loadedDatabaseHealth] = await Promise.all([
+        const [loadedSettings, loadedStatus] = await Promise.all([
           getSettings(),
-          getAppStatus(),
-          getDatabaseHealth()
+          getAppStatus()
         ]);
 
         if (!alive) return;
         setSettings(loadedSettings);
         setStatus(loadedStatus);
-        setDatabaseHealth(loadedDatabaseHealth);
       } catch (loadError) {
         if (!alive) return;
         showToast('error', readableError(loadError));
@@ -141,16 +135,6 @@ export function useSettingsShell() {
     }
   }
 
-  async function handleCheckAsrService() {
-    try {
-      const result = await checkAsrService();
-      setAsrResult(result);
-      showToast('success', t('notice.asrChecked'));
-    } catch (asrError) {
-      showToast('error', readableError(asrError));
-    }
-  }
-
   async function handleClearHistory() {
     try {
       const result = await clearHistory();
@@ -163,10 +147,7 @@ export function useSettingsShell() {
   return {
     activePage,
     activeTitle,
-    asrResult,
-    databaseHealth,
     handleAutostart,
-    handleCheckAsrService,
     handleCheckUpdate,
     handleClearHistory,
     handleReset,

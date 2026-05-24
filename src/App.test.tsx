@@ -102,32 +102,26 @@ describe('FlowType settings shell', () => {
     vi.restoreAllMocks();
   });
 
-  test('renders the status dashboard after loading native state', async () => {
+  test('renders the hotkey page after loading native state', async () => {
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hotkey' })).toBeInTheDocument();
     expect(screen.getByText('Version 0.1.0')).toBeInTheDocument();
-    expect(screen.getByText('SQLite healthy')).toBeInTheDocument();
-    expect(screen.getByText('Mode: raw')).toBeInTheDocument();
+    expect(screen.getByLabelText('Hold-to-talk hotkey')).toBeInTheDocument();
   });
 
-  test('navigates between all Phase 0 settings pages', async () => {
+  test('shows only user-facing settings pages in navigation', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
+    expect(screen.queryByRole('button', { name: 'Status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'ASR Service' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Permissions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Text Output' })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
     expect(screen.getByRole('heading', { name: 'Hotkey' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
-    expect(screen.getByRole('heading', { name: 'ASR Service' })).toBeInTheDocument();
-    expect(screen.queryByText(/Whisper/i)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Permissions' }));
-    expect(screen.getByRole('heading', { name: 'Permissions' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Text Output' }));
-    expect(screen.getByRole('heading', { name: 'Text Output' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     expect(screen.getByRole('heading', { name: 'Advanced' })).toBeInTheDocument();
@@ -143,7 +137,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
     await user.click(screen.getByLabelText('Hold-to-talk hotkey'));
     await user.keyboard('{Control>}{Space}{/Control}');
@@ -156,45 +150,11 @@ describe('FlowType settings shell', () => {
     });
   });
 
-  test('shows RTASR service status without short dictation options', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await screen.findByRole('heading', { name: 'Status' });
-    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
-
-    expect(screen.getByText('Provider: iFlytek RTASR')).toBeInTheDocument();
-    expect(screen.getByText('Realtime transcription only')).toBeInTheDocument();
-    expect(screen.getByText(/streamed to iFlytek RTASR/i)).toBeInTheDocument();
-    expect(screen.queryByText('Local first')).not.toBeInTheDocument();
-    expect(screen.queryByText('Default model')).not.toBeInTheDocument();
-  });
-
-  test('saves RTASR credentials through settings', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await screen.findByRole('heading', { name: 'Status' });
-    await user.click(screen.getByRole('button', { name: 'ASR Service' }));
-    await user.type(screen.getByLabelText('RTASR AppID'), 'test-app-id');
-    await user.type(screen.getByLabelText('RTASR API Key'), 'test-api-key');
-    await user.click(screen.getByRole('button', { name: 'Save settings' }));
-
-    await waitFor(() => {
-      expect(bridge.saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          rtasr_app_id: 'test-app-id',
-          rtasr_api_key: 'test-api-key'
-        })
-      );
-    });
-  });
-
   test('checks updates with a mock manifest and renders the result', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     await user.click(screen.getByRole('button', { name: 'Check update' }));
 
@@ -205,7 +165,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
@@ -229,7 +189,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'History' }));
 
     expect(await screen.findByText('final transcript')).toBeInTheDocument();
@@ -247,7 +207,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     await user.click(screen.getByRole('checkbox', { name: 'Launch FlowType at startup' }));
 
@@ -263,7 +223,7 @@ describe('FlowType settings shell', () => {
     });
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: '状态' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '快捷键' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '高级设置' })).toBeInTheDocument();
   });
 
@@ -271,7 +231,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     await user.selectOptions(screen.getByLabelText('Display language'), 'zh-CN');
     expect(await screen.findByRole('heading', { name: '高级设置' })).toBeInTheDocument();
@@ -288,7 +248,7 @@ describe('FlowType settings shell', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Status' });
+    await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Hotkey' }));
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 

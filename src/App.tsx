@@ -12,10 +12,6 @@ import { AboutPage } from './app/pages/AboutPage';
 import { AdvancedPage } from './app/pages/AdvancedPage';
 import { HistoryPage } from './app/pages/HistoryPage';
 import { HotkeyPage } from './app/pages/HotkeyPage';
-import { OutputPage } from './app/pages/OutputPage';
-import { PermissionsPage } from './app/pages/PermissionsPage';
-import { StatusPage } from './app/pages/StatusPage';
-import { VoicePage } from './app/pages/VoicePage';
 import { I18nContext, translate } from './lib/i18n/I18nContext';
 import { resolveLocale } from './lib/i18n/locale';
 
@@ -33,9 +29,9 @@ export default function App() {
   }
 
   const shell = useSettingsShell();
-  const { activePage, activeTitle, databaseHealth, settings, status } = shell;
+  const { activePage, activeTitle, settings, status } = shell;
 
-  if (!settings || !status || !databaseHealth) {
+  if (!settings || !status) {
     const loadingLocale = resolveLocale('auto');
 
     return (
@@ -65,24 +61,7 @@ export default function App() {
             <PageHeader title={activeTitle} version={status.app_version} />
 
             <form onSubmit={shell.handleSave}>
-              {activePage === 'status' && (
-                <StatusPage status={status} databaseHealth={databaseHealth} settings={settings} />
-              )}
-              {activePage === 'hotkey' && (
-                <HotkeyPage settings={settings} setSettings={shell.setSettings} />
-              )}
-              {activePage === 'voice' && (
-                <VoicePage
-                  settings={settings}
-                  setSettings={shell.setSettings}
-                  asrResult={shell.asrResult}
-                  onCheckAsrService={shell.handleCheckAsrService}
-                />
-              )}
-              {activePage === 'permissions' && <PermissionsPage />}
-              {activePage === 'output' && (
-                <OutputPage settings={settings} setSettings={shell.setSettings} />
-              )}
+              {activePage === 'hotkey' && <HotkeyPage settings={settings} setSettings={shell.setSettings} />}
               {activePage === 'advanced' && (
                 <AdvancedPage
                   settings={settings}
@@ -98,7 +77,7 @@ export default function App() {
               )}
               {activePage === 'about' && <AboutPage />}
 
-              {activePage !== 'status' && activePage !== 'about' && (
+              {activePage !== 'about' && (
                 <FormActions onReset={shell.handleReset} />
               )}
             </form>
