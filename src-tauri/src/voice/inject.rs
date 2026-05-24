@@ -4,8 +4,6 @@ use rdev::{simulate, EventType, Key};
 use serde::Serialize;
 use std::{thread, time::Duration};
 
-const RESTORE_DELAY_MS: u64 = 800;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InjectionDeliveryMode {
@@ -81,7 +79,6 @@ trait InjectionAdapter {
     fn write_plain_text_to_clipboard(&mut self, text: &str) -> Result<(), String>;
     fn has_editable_focus(&self) -> bool;
     fn simulate_paste(&mut self) -> Result<(), String>;
-    fn wait(&mut self, duration: Duration);
 }
 
 struct SystemInjectionAdapter {
@@ -120,15 +117,12 @@ impl InjectionAdapter for SystemInjectionAdapter {
         paste_from_clipboard().map_err(|error| format!("{error:?}"))
     }
 
-    fn wait(&mut self, duration: Duration) {
-        thread::sleep(duration);
-    }
 }
 
 fn perform_injection<A: InjectionAdapter>(
     adapter: &mut A,
     text: &str,
-    clipboard_restore: &ClipboardRestore,
+    _clipboard_restore: &ClipboardRestore,
 ) -> Result<TextInjectionResult, TextInjectionFailure> {
     let text = text.trim();
     if text.is_empty() {
@@ -156,7 +150,7 @@ fn perform_injection<A: InjectionAdapter>(
             clipboard_restored: false,
             manual_action_required: true,
             error_code: None,
-            message: "Text copied to clipboard. Paste it into the target app.".to_string(),
+            message: "Text copied to clipboard. Focus an input box and paste it manually.".to_string(),
         });
     }
 
@@ -168,70 +162,14 @@ fn perform_injection<A: InjectionAdapter>(
         )
     })?;
 
-    match restore_clipboard_if_needed(adapter, previous_text.as_deref(), clipboard_restore) {
-        ClipboardRestoreResult::NotRequested => Ok(TextInjectionResult {
-            delivery_mode: InjectionDeliveryMode::Pasted,
-            clipboard_restored: false,
-            manual_action_required: false,
-            error_code: None,
-            message: "Text injected successfully.".to_string(),
-        }),
-        ClipboardRestoreResult::Restored => Ok(TextInjectionResult {
-            delivery_mode: InjectionDeliveryMode::Pasted,
-            clipboard_restored: true,
-            manual_action_required: false,
-            error_code: None,
-            message: "Text injected successfully.".to_string(),
-        }),
-        ClipboardRestoreResult::SkippedUnavailable => Ok(TextInjectionResult {
-            delivery_mode: InjectionDeliveryMode::Pasted,
-            clipboard_restored: false,
-            manual_action_required: true,
-            error_code: Some("INJECT_RESTORE_FAILED".to_string()),
-            message: "Text injected, but the previous clipboard text could not be restored.".to_string(),
-        }),
-        ClipboardRestoreResult::RestoreFailed(error) => Ok(TextInjectionResult {
-            delivery_mode: InjectionDeliveryMode::Pasted,
-            clipboard_restored: false,
-            manual_action_required: true,
-            error_code: Some("INJECT_RESTORE_FAILED".to_string()),
-            message: format!("Text injected, but clipboard restore failed: {error}"),
-        }),
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ClipboardRestoreResult {
-    NotRequested,
-    Restored,
-    SkippedUnavailable,
-    RestoreFailed(String),
-}
-
-fn restore_clipboard_if_needed<A: InjectionAdapter>(
-    adapter: &mut A,
-    previous_text: Option<&str>,
-    clipboard_restore: &ClipboardRestore,
-) -> ClipboardRestoreResult {
-    if !matches!(
-        clipboard_restore,
-        ClipboardRestore::Always | ClipboardRestore::TextOnly | ClipboardRestore::Delayed
-    ) {
-        return ClipboardRestoreResult::NotRequested;
-    }
-
-    let Some(previous_text) = previous_text else {
-        return ClipboardRestoreResult::SkippedUnavailable;
-    };
-
-    if matches!(clipboard_restore, ClipboardRestore::Delayed) {
-        adapter.wait(Duration::from_millis(RESTORE_DELAY_MS));
-    }
-
-    match adapter.write_plain_text_to_clipboard(previous_text) {
-        Ok(()) => ClipboardRestoreResult::Restored,
-        Err(error) => ClipboardRestoreResult::RestoreFailed(error),
-    }
+    let _ = previous_text;
+    Ok(TextInjectionResult {
+        delivery_mode: InjectionDeliveryMode::Pasted,
+        clipboard_restored: false,
+        manual_action_required: false,
+        error_code: None,
+        message: "Text injected successfully and kept in clipboard.".to_string(),
+    })
 }
 
 fn injection_failure(
@@ -269,12 +207,9 @@ mod tests {
         previous_text: Option<String>,
         capture_error: Option<String>,
         initial_write_error: Option<String>,
-        restore_write_error: Option<String>,
         paste_error: Option<String>,
         has_focus: bool,
         writes: Vec<String>,
-        waits: Vec<Duration>,
-        write_calls: usize,
     }
 
     impl InjectionAdapter for FakeInjectionAdapter {
@@ -286,12 +221,7 @@ mod tests {
         }
 
         fn write_plain_text_to_clipboard(&mut self, text: &str) -> Result<(), String> {
-            self.write_calls += 1;
-            if self.write_calls == 1 {
-                if let Some(error) = &self.initial_write_error {
-                    return Err(error.clone());
-                }
-            } else if let Some(error) = &self.restore_write_error {
+            if let Some(error) = &self.initial_write_error {
                 return Err(error.clone());
             }
             self.writes.push(text.to_string());
@@ -307,10 +237,6 @@ mod tests {
                 Some(error) => Err(error.clone()),
                 None => Ok(()),
             }
-        }
-
-        fn wait(&mut self, duration: Duration) {
-            self.waits.push(duration);
         }
     }
 
@@ -353,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn pasted_result_restores_previous_text_when_requested() {
+    fn pasted_result_keeps_recognized_text_in_clipboard() {
         let mut adapter = FakeInjectionAdapter {
             has_focus: true,
             previous_text: Some("previous text".to_string()),
@@ -364,45 +290,10 @@ mod tests {
 
         assert_eq!(result.delivery_mode, InjectionDeliveryMode::Pasted);
         assert!(result.injected());
-        assert!(result.clipboard_restored);
+        assert!(!result.clipboard_restored);
         assert!(!result.manual_action_required);
         assert_eq!(result.error_code, None);
-        assert_eq!(
-            adapter.writes,
-            vec!["hello world".to_string(), "previous text".to_string()]
-        );
-    }
-
-    #[test]
-    fn delayed_restore_waits_before_restoring_clipboard() {
-        let mut adapter = FakeInjectionAdapter {
-            has_focus: true,
-            previous_text: Some("previous text".to_string()),
-            ..Default::default()
-        };
-
-        let result = perform_injection(&mut adapter, "hello world", &ClipboardRestore::Delayed).unwrap();
-
-        assert!(result.clipboard_restored);
-        assert_eq!(adapter.waits, vec![Duration::from_millis(RESTORE_DELAY_MS)]);
-    }
-
-    #[test]
-    fn restore_failure_returns_success_with_warning_code() {
-        let mut adapter = FakeInjectionAdapter {
-            has_focus: true,
-            previous_text: Some("previous text".to_string()),
-            restore_write_error: Some("clipboard locked".to_string()),
-            ..Default::default()
-        };
-
-        let result = perform_injection(&mut adapter, "hello world", &ClipboardRestore::Always).unwrap();
-
-        assert_eq!(result.delivery_mode, InjectionDeliveryMode::Pasted);
-        assert!(!result.clipboard_restored);
-        assert!(result.manual_action_required);
-        assert_eq!(result.error_code.as_deref(), Some("INJECT_RESTORE_FAILED"));
-        assert!(result.message.contains("clipboard restore failed"));
+        assert_eq!(adapter.writes, vec!["hello world".to_string()]);
     }
 
     #[test]

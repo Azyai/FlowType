@@ -26,21 +26,8 @@ export function OutputPage({
         </select>
       </label>
       <label className="field">
-        <span>{t('output.clipboardRestore')}</span>
-        <select
-          value={settings.clipboard_restore}
-          onChange={(event) =>
-            setSettings({
-              ...settings,
-              clipboard_restore: event.target.value as AppSettings['clipboard_restore']
-            })
-          }
-        >
-          <option value="always">{t('output.restoreAlways')}</option>
-          <option value="delayed">{t('output.restoreDelayed')}</option>
-          <option value="never">{t('output.restoreNever')}</option>
-          <option value="text_only">{t('output.restoreTextOnly')}</option>
-        </select>
+        <span>{t('output.deliveryMode')}</span>
+        <input value={t('output.deliveryCombined')} readOnly />
       </label>
     </section>
   );

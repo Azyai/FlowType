@@ -32,7 +32,7 @@ export function StatusPage({
       />
       <InfoCard icon={Mic} label={t('status.voiceInput')} value={t('status.notImplementedPhase0')} />
       <InfoCard icon={Keyboard} label={t('status.hotkey')} value={settings.hotkey} />
-      <InfoCard icon={Clipboard} label={t('status.clipboard')} value={settings.clipboard_restore} />
+      <InfoCard icon={Clipboard} label={t('status.clipboard')} value={t('status.clipboardCombined')} />
     </div>
   );
 }

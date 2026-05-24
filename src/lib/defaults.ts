@@ -15,7 +15,7 @@ export const defaultSettings: AppSettings = {
   rtasr_language: 'zh_cn',
   rtasr_timeout_ms: 10000,
   output_style: 'raw',
-  clipboard_restore: 'always',
+  clipboard_restore: 'never',
   floating_window_position: 'bottom_right',
   show_floating_window: true,
   floating_window_always_on_top: true,
