@@ -279,6 +279,28 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByText(/history item 01 transcript/i)).toBeInTheDocument();
   });
 
+  test('keeps pagination visible when history search has no matches', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Hotkey' });
+    await user.click(screen.getByRole('button', { name: 'History' }));
+
+    const searchInput = screen.getByLabelText('Search history');
+    await user.type(searchInput, 'no-match-keyword');
+
+    await waitFor(() => {
+      expect(bridge.getHistory).toHaveBeenCalledWith(25, 0);
+    });
+
+    expect(await screen.findByText('No matching history records')).toBeInTheDocument();
+    expect(screen.getByText('Try a different keyword to search transcript history.')).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Go' })).toBeDisabled();
+  });
+
   test('toggles autostart through the native bridge', async () => {
     const user = userEvent.setup();
     render(<App />);

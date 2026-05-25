@@ -373,82 +373,80 @@ export function HistoryPage({
           )}
         </div>
 
-        {displayItems.length > 0 && (
-          <div className="history-pagination">
-            <span className="history-page-summary">
-              {t('history.pageLabel', { current: resolvedCurrentPage, total: totalPages })}
-            </span>
+        <div className="history-pagination">
+          <span className="history-page-summary">
+            {t('history.pageLabel', { current: resolvedCurrentPage, total: totalPages })}
+          </span>
 
-            <div className="history-page-buttons">
-              <button
-                type="button"
-                className="secondary-button history-page-button"
-                onClick={() => handlePageChange(resolvedCurrentPage - 1)}
-                disabled={actionsDisabled || resolvedCurrentPage === 1}
-              >
-                <ChevronLeft aria-hidden="true" />
-                {t('history.previousPage')}
-              </button>
+          <div className="history-page-buttons">
+            <button
+              type="button"
+              className="secondary-button history-page-button"
+              onClick={() => handlePageChange(resolvedCurrentPage - 1)}
+              disabled={actionsDisabled || resolvedCurrentPage === 1}
+            >
+              <ChevronLeft aria-hidden="true" />
+              {t('history.previousPage')}
+            </button>
 
-              {paginationItems.map((item, index) =>
-                item === 'ellipsis' ? (
-                  <span key={`ellipsis-${index}`} className="history-page-ellipsis" aria-hidden="true">
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`secondary-button history-page-button${item === resolvedCurrentPage ? ' active' : ''}`}
-                    onClick={() => handlePageChange(item)}
-                    disabled={actionsDisabled || item === resolvedCurrentPage}
-                    aria-current={item === resolvedCurrentPage ? 'page' : undefined}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
+            {paginationItems.map((item, index) =>
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className="history-page-ellipsis" aria-hidden="true">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  className={`secondary-button history-page-button${item === resolvedCurrentPage ? ' active' : ''}`}
+                  onClick={() => handlePageChange(item)}
+                  disabled={actionsDisabled || item === resolvedCurrentPage}
+                  aria-current={item === resolvedCurrentPage ? 'page' : undefined}
+                >
+                  {item}
+                </button>
+              )
+            )}
 
-              <button
-                type="button"
-                className="secondary-button history-page-button"
-                onClick={() => handlePageChange(resolvedCurrentPage + 1)}
-                disabled={actionsDisabled || resolvedCurrentPage === totalPages}
-              >
-                {t('history.nextPage')}
-                <ChevronRight aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="history-page-jump">
-              <label htmlFor="history-page-jump-input">{t('history.jumpToPage')}</label>
-              <input
-                id="history-page-jump-input"
-                type="number"
-                min={1}
-                max={totalPages}
-                inputMode="numeric"
-                value={jumpPageValue}
-                onChange={(event) => setJumpPageValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    handleJumpToPage();
-                  }
-                }}
-                disabled={actionsDisabled}
-              />
-              <button
-                type="button"
-                className="secondary-button history-jump-button"
-                onClick={handleJumpToPage}
-                disabled={actionsDisabled || !canJumpToPage}
-              >
-                {t('history.goToPage')}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="secondary-button history-page-button"
+              onClick={() => handlePageChange(resolvedCurrentPage + 1)}
+              disabled={actionsDisabled || resolvedCurrentPage === totalPages}
+            >
+              {t('history.nextPage')}
+              <ChevronRight aria-hidden="true" />
+            </button>
           </div>
-        )}
+
+          <div className="history-page-jump">
+            <label htmlFor="history-page-jump-input">{t('history.jumpToPage')}</label>
+            <input
+              id="history-page-jump-input"
+              type="number"
+              min={1}
+              max={totalPages}
+              inputMode="numeric"
+              value={jumpPageValue}
+              onChange={(event) => setJumpPageValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleJumpToPage();
+                }
+              }}
+              disabled={actionsDisabled}
+            />
+            <button
+              type="button"
+              className="secondary-button history-jump-button"
+              onClick={handleJumpToPage}
+              disabled={actionsDisabled || !canJumpToPage}
+            >
+              {t('history.goToPage')}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
