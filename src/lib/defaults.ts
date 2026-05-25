@@ -35,7 +35,7 @@ export const defaultSettings: AppSettings = {
 };
 
 export const fallbackStatus: AppStatus = {
-  app_version: '0.1.0',
+  app_version: '0.1.1',
   paused: false,
   current_mode: defaultSettings.output_style,
   tray_available: false

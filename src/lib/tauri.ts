@@ -63,8 +63,8 @@ export function getDatabaseHealth(): Promise<DatabaseHealth> {
 export function checkUpdate(): Promise<UpdateCheckResult> {
   return nativeInvoke('check_update', undefined, {
     status: 'latest',
-    current_version: '0.1.0',
-    latest_version: '0.1.0',
+    current_version: '0.1.1',
+    latest_version: '0.1.1',
     channel: defaultSettings.update_channel,
     notes: null,
     manifest_url: defaultSettings.update_manifest_url

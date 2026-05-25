@@ -1,6 +1,6 @@
 [package]
 name = "flowtype"
-version = "0.1.0"
+version = "0.1.1"
 description = "FlowType desktop voice input foundation"
 authors = ["FlowType"]
 edition = "2021"

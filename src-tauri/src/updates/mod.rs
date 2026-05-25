@@ -120,10 +120,10 @@ mod tests {
     fn mock_manifest_reports_newer_stable_version() {
         let settings = AppSettings::default();
 
-        let result = check_for_update(&settings, "0.1.0").unwrap();
+        let result = check_for_update(&settings, "0.1.1").unwrap();
 
         assert_eq!(result.status, UpdateStatus::Available);
-        assert_eq!(result.latest_version, Some("0.1.1".to_string()));
+        assert_eq!(result.latest_version, Some("0.1.2".to_string()));
         assert_eq!(result.channel, UpdateChannel::Stable);
     }
 
@@ -131,7 +131,7 @@ mod tests {
     fn equal_remote_version_reports_latest() {
         let settings = AppSettings::default();
 
-        let result = check_for_update(&settings, "0.1.1").unwrap();
+        let result = check_for_update(&settings, "0.1.2").unwrap();
 
         assert_eq!(result.status, UpdateStatus::Latest);
     }
@@ -149,7 +149,7 @@ mod tests {
             ..AppSettings::default()
         };
 
-        let result = check_for_update(&settings, "0.1.0").unwrap();
+        let result = check_for_update(&settings, "0.1.1").unwrap();
 
         assert_eq!(result.status, UpdateStatus::ChannelUnavailable);
         assert_eq!(result.latest_version, None);
@@ -162,7 +162,7 @@ mod tests {
             ..AppSettings::default()
         };
 
-        let result = check_for_update(&settings, "0.1.0").unwrap();
+        let result = check_for_update(&settings, "0.1.1").unwrap();
 
         assert_eq!(result.status, UpdateStatus::Failed);
         assert_eq!(result.latest_version, None);
