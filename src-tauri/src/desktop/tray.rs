@@ -1,16 +1,14 @@
 use crate::{
     app::AppState,
-    commands,
-    desktop::tray_i18n::{mode_label, tray_labels},
-    settings::OutputStyle,
     error::{AppError, AppResult},
+    desktop::tray_i18n::tray_labels,
     desktop::windows,
 };
 use tauri::{
-    image::Image,
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
     App, AppHandle, Manager,
+    image::Image,
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
 };
 
 pub fn create(app: &App) -> tauri::Result<()> {
@@ -42,55 +40,30 @@ pub fn refresh(app: &AppHandle) -> AppResult<()> {
 }
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let (labels, paused, output_style) = app
+    let labels = app
         .try_state::<AppState>()
         .and_then(|state| {
             state
                 .settings()
                 .ok()
-                .map(|settings| (tray_labels(&settings.locale_preference), state.paused(), settings.output_style))
+                .map(|settings| tray_labels(&settings.locale_preference))
         })
-        .unwrap_or_else(|| {
-            let labels = tray_labels(&crate::settings::LocalePreference::Auto);
-            (labels, false, OutputStyle::Raw)
-        });
-
-    let pause_label = if paused {
-        labels.resume_voice
+        .unwrap_or_else(|| tray_labels(&crate::settings::LocalePreference::Auto));
+    let mascot_toggle_label = if mascot_is_visible(app) {
+        labels.hide_mascot
     } else {
-        labels.pause_voice
+        labels.show_mascot
     };
 
     let open_settings = MenuItem::with_id(app, "open_settings", labels.open_settings, true, None::<&str>)?;
-    let pause_voice = MenuItem::with_id(app, "pause_voice", pause_label, true, None::<&str>)?;
-    let show_mascot = MenuItem::with_id(app, "show_mascot", labels.show_mascot, true, None::<&str>)?;
-    let mode_raw = MenuItem::with_id(app, "mode_raw", labels.mode_raw, true, None::<&str>)?;
-    let mode_clean = MenuItem::with_id(app, "mode_clean", labels.mode_clean, true, None::<&str>)?;
-    let mode_formal = MenuItem::with_id(app, "mode_formal", labels.mode_formal, true, None::<&str>)?;
-    let check_microphone =
-        MenuItem::with_id(app, "check_microphone", labels.check_microphone, true, None::<&str>)?;
-    let view_history = MenuItem::with_id(app, "view_history", labels.view_history, true, None::<&str>)?;
+    let toggle_mascot = MenuItem::with_id(app, "toggle_mascot", mascot_toggle_label, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;
-    let separator_one = PredefinedMenuItem::separator(app)?;
-    let separator_two = PredefinedMenuItem::separator(app)?;
-    let separator_three = PredefinedMenuItem::separator(app)?;
-
-    log::debug!("building tray menu with current {}", mode_label(labels, &output_style));
 
     Menu::with_items(
         app,
         &[
             &open_settings,
-            &pause_voice,
-            &show_mascot,
-            &separator_one,
-            &mode_raw,
-            &mode_clean,
-            &mode_formal,
-            &separator_two,
-            &check_microphone,
-            &view_history,
-            &separator_three,
+            &toggle_mascot,
             &quit,
         ],
     )
@@ -99,25 +72,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 fn handle_menu_event(app: &AppHandle, id: &str) -> AppResult<()> {
     match id {
         "open_settings" => windows::show_main_window(app),
-        "pause_voice" => {
-            if let Some(state) = app.try_state::<AppState>() {
-                let paused = state.toggle_paused();
-                log::info!("voice input paused: {paused}");
+        "toggle_mascot" => {
+            if mascot_is_visible(app) {
+                windows::hide_mascot_windows(app)?;
+            } else {
+                windows::spawn_mascot_window(app)?;
             }
             refresh(app)?;
             Ok(())
-        }
-        "show_mascot" => windows::spawn_mascot_window(app),
-        "mode_raw" => set_mode(app, OutputStyle::Raw),
-        "mode_clean" => set_mode(app, OutputStyle::Clean),
-        "mode_formal" => set_mode(app, OutputStyle::Formal),
-        "check_microphone" => {
-            log::info!("microphone check requested; audio capture starts in Phase 2");
-            windows::show_main_window(app)
-        }
-        "view_history" => {
-            log::info!("history requested; history tables start in a later phase");
-            windows::show_main_window(app)
         }
         "quit" => {
             app.exit(0);
@@ -127,16 +89,10 @@ fn handle_menu_event(app: &AppHandle, id: &str) -> AppResult<()> {
     }
 }
 
-fn set_mode(app: &AppHandle, output_style: OutputStyle) -> AppResult<()> {
-    let Some(state) = app.try_state::<AppState>() else {
-        return Err(AppError::StateLock);
-    };
-
-    commands::set_output_style(&state, output_style).map_err(|error| {
-        AppError::Window(format!("failed to update output mode: {}", error.message))
-    })?;
-    refresh(app)?;
-    Ok(())
+fn mascot_is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window("mascot")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
 }
 
 fn create_icon() -> Image<'static> {

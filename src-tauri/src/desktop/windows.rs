@@ -46,6 +46,16 @@ pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
     Ok(())
 }
 
+pub fn hide_mascot_windows(app: &AppHandle) -> AppResult<()> {
+    if let Some(window) = app.get_webview_window("mascot") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    if let Some(window) = app.get_webview_window("live-caption") {
+        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    }
+    Ok(())
+}
+
 pub fn spawn_live_caption_window(app: &AppHandle) -> AppResult<()> {
     if let Some(window) = app.get_webview_window("live-caption") {
         let _ = window.set_always_on_top(true);

@@ -164,18 +164,24 @@ pub fn get_voice_status(state: State<AppState>) -> CommandResult<VoiceSessionEve
 #[tauri::command]
 pub fn show_mascot_window(app: AppHandle) -> CommandResult<()> {
     windows::spawn_live_caption_window(&app).map_err(error_response)?;
-    into_command(windows::spawn_mascot_window(&app))
+    let result = windows::spawn_mascot_window(&app);
+    if result.is_ok() {
+        if let Err(error) = tray::refresh(&app) {
+            log::warn!("failed to refresh tray after showing mascot window: {error:?}");
+        }
+    }
+    into_command(result)
 }
 
 #[tauri::command]
 pub fn hide_mascot_window(app: AppHandle) -> CommandResult<()> {
-    if let Some(window) = app.get_webview_window("mascot") {
-        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
+    let result = windows::hide_mascot_windows(&app);
+    if result.is_ok() {
+        if let Err(error) = tray::refresh(&app) {
+            log::warn!("failed to refresh tray after hiding mascot window: {error:?}");
+        }
     }
-    if let Some(window) = app.get_webview_window("live-caption") {
-        window.hide().map_err(|error| AppError::Window(error.to_string()))?;
-    }
-    Ok(())
+    into_command(result)
 }
 
 #[tauri::command]
@@ -314,10 +320,5 @@ fn sync_floating_windows(app: &AppHandle, show: bool) {
         return;
     }
 
-    if let Some(window) = app.get_webview_window("mascot") {
-        let _ = window.hide();
-    }
-    if let Some(window) = app.get_webview_window("live-caption") {
-        let _ = window.hide();
-    }
+    let _ = crate::desktop::windows::hide_mascot_windows(app);
 }
