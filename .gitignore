@@ -1,0 +1,12 @@
+.codex/
+asserts/
+prd/
+.npm-cache*/
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/true/
+.github/
+src-tauri/$null
+src-tauri/target-local/
