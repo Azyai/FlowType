@@ -6,6 +6,140 @@
   font-weight: 700;
 }
 
+.skill-fieldset {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #e6e8ef;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 90, 79, 0.05), rgba(255, 255, 255, 0) 48%),
+    #fffdfc;
+}
+
+.skill-fieldset.is-disabled {
+  background: #fbfcfe;
+}
+
+.skill-fieldset-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-fieldset-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.skill-fieldset legend {
+  padding: 0;
+  color: #1c1f24;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.skill-fieldset p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.skill-state-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #6b7280;
+  background: #eef2f7;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.skill-state-badge.is-active {
+  color: #9a3412;
+  background: #fff0e8;
+}
+
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.skill-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid #e6e8ef;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.skill-card:hover {
+  border-color: #ffb4a8;
+  box-shadow: 0 12px 24px rgba(27, 31, 42, 0.06);
+}
+
+.skill-card.is-selected {
+  border-color: #ff8b7d;
+  box-shadow: 0 0 0 3px rgba(255, 90, 79, 0.1);
+  background: #fff7f3;
+}
+
+.skill-card.is-readonly {
+  cursor: not-allowed;
+}
+
+.skill-card input[type='radio'] {
+  width: 18px;
+  min-height: 18px;
+  margin: 2px 0 0;
+  accent-color: #ff5a4f;
+}
+
+.skill-card-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.skill-card-copy strong {
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.skill-card-copy span {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.skill-fieldset.is-disabled .skill-card {
+  opacity: 0.82;
+  background: #f8fafc;
+}
+
+.skill-card input[type='radio']:focus-visible {
+  outline: 2px solid #ff5a4f;
+  outline-offset: 2px;
+}
+
 input,
 select {
   width: 100%;
@@ -114,4 +248,10 @@ select:focus {
 .secondary-button svg {
   width: 17px;
   height: 17px;
+}
+
+@media (max-width: 760px) {
+  .skill-grid {
+    grid-template-columns: 1fr;
+  }
 }

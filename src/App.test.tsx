@@ -184,7 +184,13 @@ describe('FlowType settings shell', () => {
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    const emailSkill = screen.getByRole('radio', { name: 'Email drafting' });
+    expect(screen.getByText('Available in formal mode')).toBeInTheDocument();
+    expect(emailSkill).toBeDisabled();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
+    expect(await screen.findByText('Active in formal mode')).toBeInTheDocument();
+    expect(emailSkill).toBeEnabled();
+    await user.click(emailSkill);
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
     expect(screen.queryByRole('checkbox', { name: 'Keep floating window on top' })).not.toBeInTheDocument();
@@ -197,6 +203,7 @@ describe('FlowType settings shell', () => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           output_style: 'formal',
+          formal_scene: 'email',
           history_retention_days: 30,
           show_floating_window: false
         })

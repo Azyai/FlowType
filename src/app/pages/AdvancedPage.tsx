@@ -2,6 +2,33 @@ import type { AppSettings, HistoryRetentionDays, UpdateCheckResult } from '../..
 import { updateMessage } from '../../lib/formatters/updateMessage';
 import { useI18n } from '../../lib/i18n/I18nContext';
 
+const formalSceneOptions: Array<{
+  value: AppSettings['formal_scene'];
+  labelKey: string;
+  descriptionKey: string;
+}> = [
+  {
+    value: 'general',
+    labelKey: 'advanced.formalSkillGeneral',
+    descriptionKey: 'advanced.formalSkillGeneralDesc'
+  },
+  {
+    value: 'email',
+    labelKey: 'advanced.formalSkillEmail',
+    descriptionKey: 'advanced.formalSkillEmailDesc'
+  },
+  {
+    value: 'greeting',
+    labelKey: 'advanced.formalSkillGreeting',
+    descriptionKey: 'advanced.formalSkillGreetingDesc'
+  },
+  {
+    value: 'professional_reply',
+    labelKey: 'advanced.formalSkillReply',
+    descriptionKey: 'advanced.formalSkillReplyDesc'
+  }
+];
+
 export function AdvancedPage({
   settings,
   setSettings,
@@ -16,6 +43,7 @@ export function AdvancedPage({
   onAutostart: (enabled: boolean) => void;
 }) {
   const { t } = useI18n();
+  const formalModeEnabled = settings.output_style === 'formal';
 
   return (
     <section className="panel">
@@ -34,14 +62,62 @@ export function AdvancedPage({
         </select>
       </label>
 
+      <fieldset
+        className={`skill-fieldset${formalModeEnabled ? '' : ' is-disabled'}`}
+        aria-describedby="formal-skill-description"
+      >
+        <legend>{t('advanced.formalSkill' as any)}</legend>
+        <div className="skill-fieldset-header">
+          <div className="skill-fieldset-copy">
+            <p id="formal-skill-description">
+              {formalModeEnabled ? t('advanced.formalSkillHint' as any) : t('advanced.formalSkillDisabledHint' as any)}
+            </p>
+          </div>
+          <span className={`skill-state-badge${formalModeEnabled ? ' is-active' : ''}`}>
+            {formalModeEnabled ? t('advanced.skillEnabled' as any) : t('advanced.skillDisabled' as any)}
+          </span>
+        </div>
+
+        <div className="skill-grid" role="radiogroup" aria-label={t('advanced.formalSkill' as any)}>
+          {formalSceneOptions.map((option) => {
+            const checked = settings.formal_scene === option.value;
+            return (
+              <label
+                key={option.value}
+                className={`skill-card${checked ? ' is-selected' : ''}${formalModeEnabled ? '' : ' is-readonly'}`}
+              >
+                <input
+                  type="radio"
+                  name="formal-scene"
+                  value={option.value}
+                  checked={checked}
+                  aria-label={t(option.labelKey as any)}
+                  disabled={!formalModeEnabled}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      formal_scene: event.target.value as AppSettings['formal_scene']
+                    })
+                  }
+                />
+                <div className="skill-card-copy">
+                  <strong>{t(option.labelKey as any)}</strong>
+                  <span>{t(option.descriptionKey as any)}</span>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+
       <label className="switch-row">
         <input
           type="checkbox"
           checked={settings.auto_start}
           onChange={(event) => onAutostart(event.target.checked)}
-          aria-label={t('advanced.launchAtStartup')}
+          aria-label={t('advanced.launchAtStartup' as any)}
         />
-        <span>{t('advanced.launchAtStartup')}</span>
+        <span>{t('advanced.launchAtStartup' as any)}</span>
       </label>
       <label className="switch-row">
         <input
@@ -52,10 +128,10 @@ export function AdvancedPage({
         <span>{t('advanced.keepHistory')}</span>
       </label>
       <label className="field">
-        <span>{t('advanced.historyRetention')}</span>
+        <span>{t('advanced.historyRetention' as any)}</span>
         <select
           value={settings.history_retention_days}
-          aria-label={t('advanced.historyRetention')}
+          aria-label={t('advanced.historyRetention' as any)}
           onChange={(event) =>
             setSettings({
               ...settings,
