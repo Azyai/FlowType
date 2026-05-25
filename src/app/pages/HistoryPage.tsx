@@ -187,6 +187,7 @@ export function HistoryPage({
             const itemText = historyItemText(item);
             const previewText = truncateHistoryText(itemText);
             const isFailed = Boolean(item.error_code);
+            const chipLabel = historyItemChipLabel(item, t);
             const deliveryLabel = isFailed
               ? t('history.failed')
               : item.injected
@@ -201,9 +202,11 @@ export function HistoryPage({
                     <span>{t('history.createdAt')}: {formatDate(item.created_at)}</span>
                     <span>{t('history.duration')}: {formatDuration(item.recognition_duration_ms)}</span>
                   </div>
-                  <span className={`history-chip${isFailed ? ' danger' : ''}`}>
-                    {item.error_code ?? item.output_style}
-                  </span>
+                  {chipLabel && (
+                    <span className={`history-chip${isFailed ? ' danger' : ''}`}>
+                      {chipLabel}
+                    </span>
+                  )}
                 </div>
 
                 <div className="history-item-body compact">
@@ -258,6 +261,21 @@ export function HistoryPage({
 
 function historyItemText(item: TranscriptHistoryItem) {
   return item.final_text.trim() || item.raw_text.trim() || item.error_summary?.trim() || '-';
+}
+
+function historyItemChipLabel(
+  item: TranscriptHistoryItem,
+  t: ReturnType<typeof useI18n>['t']
+) {
+  if (item.error_code) {
+    return item.error_code;
+  }
+
+  if (item.output_style === 'raw') {
+    return null;
+  }
+
+  return t(`output.${item.output_style}`);
 }
 
 function truncateHistoryText(text: string) {

@@ -241,6 +241,7 @@ describe('FlowType settings shell', () => {
     expect(screen.getByText('History is enabled')).toBeInTheDocument();
     expect(screen.getByText('Retention: 14 days')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.queryByText(/^raw$/i)).not.toBeInTheDocument();
     expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
     expect(screen.getByText('this is a long final transcrip...')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset settings' })).not.toBeInTheDocument();
