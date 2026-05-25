@@ -512,10 +512,17 @@ fn process_server_message(raw: &str, accumulator: &mut ResultAccumulator) -> App
         return Ok(None);
     }
 
+    log::debug!("rtasr raw result payload: {}", frame.data.trim());
+
     let payload: RtasrResultPayload =
         serde_json::from_str(frame.data.trim()).map_err(|error| AppError::AsrServiceUnavailable(error.to_string()))?;
+    let previous = accumulator.combined_text();
     let text = accumulator.apply(payload);
-    Ok(Some(text))
+    if text == previous {
+        Ok(None)
+    } else {
+        Ok(Some(text))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -532,25 +539,285 @@ struct RtasrFrame {
 
 #[derive(Debug, Default)]
 struct ResultAccumulator {
-    segments: BTreeMap<i64, String>,
+    final_segments: BTreeMap<i64, String>,
+    live_segment: Option<TrackedSegment>,
+}
+
+#[derive(Debug, Clone)]
+struct TrackedSegment {
+    seg_id: i64,
+    bg: Option<i64>,
+    ed: Option<i64>,
+    text: String,
 }
 
 impl ResultAccumulator {
     fn apply(&mut self, payload: RtasrResultPayload) -> String {
-        let text = payload.text();
-        if text.is_empty() {
+        let Some(segment) = payload.tracked_segment() else {
             return self.combined_text();
+        };
+
+        if payload.is_final() {
+            self.commit_final_segment(segment);
+        } else {
+            self.update_live_segment(segment);
         }
 
-        // RTASR streams incremental updates keyed by seg_id. Keep the latest text
-        // for each segment so later updates replace earlier revisions in place.
-        self.segments.insert(payload.seg_id, text);
         self.combined_text()
     }
 
-    fn combined_text(&self) -> String {
-        self.segments.values().cloned().collect()
+    fn commit_final_segment(&mut self, segment: TrackedSegment) {
+        let accumulated = self.combined_text();
+        if should_replace_combined_text(&accumulated, &segment.text) {
+            log::debug!(
+                "rtasr final snapshot replaced accumulated text: {accumulated} -> {}",
+                segment.text
+            );
+            self.final_segments.clear();
+            self.live_segment = None;
+            self.final_segments.insert(segment.seg_id, segment.text);
+            return;
+        }
+
+        if let Some(existing) = self.combined_text_if_finalized() {
+            if should_replace_combined_text(&existing, &segment.text) {
+                log::debug!("rtasr final snapshot replaced previous combined text: {existing} -> {}", segment.text);
+                self.final_segments.clear();
+            }
+        }
+
+        if self
+            .live_segment
+            .as_ref()
+            .is_some_and(|live| segments_match(live, &segment) || should_replace_combined_text(&live.text, &segment.text))
+        {
+            self.live_segment = None;
+        }
+
+        self.commit_segment_delta(segment);
     }
+
+    fn update_live_segment(&mut self, segment: TrackedSegment) {
+        let accumulated = self.combined_text();
+        if should_replace_combined_text(&accumulated, &segment.text) {
+            log::debug!(
+                "rtasr interim snapshot replaced accumulated text: {accumulated} -> {}",
+                segment.text
+            );
+            self.final_segments.clear();
+            self.live_segment = Some(segment);
+            return;
+        }
+
+        if let Some(existing) = self.combined_text_if_finalized() {
+            if should_replace_combined_text(&existing, &segment.text) {
+                log::debug!(
+                    "rtasr interim snapshot replaced previous combined text: {existing} -> {}",
+                    segment.text
+                );
+                self.final_segments.clear();
+                self.live_segment = Some(segment);
+                return;
+            }
+        }
+
+        match self.live_segment.take() {
+            Some(current) if is_substantially_contained(&current.text, &segment.text) => {
+                log::debug!(
+                    "rtasr ignored redundant interim tail already covered by live segment: {}",
+                    segment.text
+                );
+                self.live_segment = Some(current);
+            }
+            Some(current)
+                if segments_match(&current, &segment)
+                    || should_replace_combined_text(&current.text, &segment.text) =>
+            {
+                self.live_segment = Some(segment);
+            }
+            Some(current) => {
+                self.commit_segment_delta(current);
+                self.live_segment = Some(segment);
+            }
+            None => {
+                self.live_segment = Some(segment);
+            }
+        }
+    }
+
+    fn commit_segment_delta(&mut self, segment: TrackedSegment) {
+        let committed = self.combined_text_if_finalized().unwrap_or_default();
+        let delta = unseen_suffix_after_merge(&committed, &segment.text);
+        if delta.is_empty() {
+            return;
+        }
+
+        self.final_segments.insert(segment.seg_id, delta);
+    }
+
+    fn combined_text_if_finalized(&self) -> Option<String> {
+        if self.final_segments.is_empty() {
+            None
+        } else {
+            Some(
+                self.final_segments
+                    .values()
+                    .fold(String::new(), |combined, segment| merge_with_overlap(&combined, segment)),
+            )
+        }
+    }
+
+    fn combined_text(&self) -> String {
+        let finalized = self.combined_text_if_finalized().unwrap_or_default();
+        let Some(live) = self.live_segment.as_ref() else {
+            return finalized;
+        };
+
+        if should_replace_combined_text(&finalized, &live.text) {
+            live.text.clone()
+        } else {
+            merge_with_overlap(&finalized, &live.text)
+        }
+    }
+}
+
+fn segments_match(existing: &TrackedSegment, next: &TrackedSegment) -> bool {
+    existing.seg_id == next.seg_id
+        || existing.bg.zip(next.bg).is_some_and(|(left, right)| left == right)
+        || existing.ed.zip(next.ed).is_some_and(|(left, right)| left == right)
+}
+
+fn merge_with_overlap(existing: &str, next: &str) -> String {
+    if existing.is_empty() {
+        return next.to_string();
+    }
+    if next.is_empty() {
+        return existing.to_string();
+    }
+
+    let existing_chars: Vec<char> = existing.chars().collect();
+    let next_chars: Vec<char> = next.chars().collect();
+    let max_overlap = existing_chars.len().min(next_chars.len());
+
+    let overlap = (1..=max_overlap)
+        .rev()
+        .find(|&len| existing_chars[existing_chars.len() - len..] == next_chars[..len])
+        .unwrap_or(0);
+
+    let mut merged = String::with_capacity(existing.len() + next.len().saturating_sub(overlap));
+    merged.push_str(existing);
+    merged.extend(next_chars[overlap..].iter());
+    merged
+}
+
+fn unseen_suffix_after_merge(existing: &str, next: &str) -> String {
+    if next.is_empty() {
+        return String::new();
+    }
+    if existing.is_empty() {
+        return next.to_string();
+    }
+    if should_replace_combined_text(existing, next) || is_substantially_contained(existing, next) {
+        return String::new();
+    }
+
+    let merged = merge_with_overlap(existing, next);
+    let existing_len = existing.chars().count();
+    merged.chars().skip(existing_len).collect()
+}
+
+fn should_replace_combined_text(existing: &str, next: &str) -> bool {
+    if existing.is_empty() || next.is_empty() {
+        return false;
+    }
+
+    let existing_chars: Vec<char> = existing.chars().collect();
+    let next_chars: Vec<char> = next.chars().collect();
+
+    if next_chars.len() < existing_chars.len() {
+        return false;
+    }
+
+    if next.starts_with(existing) {
+        return true;
+    }
+
+    let shared_prefix_len = existing_chars
+        .iter()
+        .zip(next_chars.iter())
+        .take_while(|(left, right)| left == right)
+        .count();
+    let shorter_len = existing_chars.len().min(next_chars.len());
+
+    shared_prefix_len * 100 >= shorter_len * 75
+}
+
+fn is_substantially_contained(existing: &str, next: &str) -> bool {
+    if existing.is_empty() || next.is_empty() {
+        return false;
+    }
+
+    let normalized_existing = normalize_for_match(existing);
+    let normalized_next = normalize_for_match(next);
+
+    if normalized_next.chars().count() < 8 {
+        return false;
+    }
+
+    normalized_existing.chars().count() >= normalized_next.chars().count()
+        && normalized_existing.contains(&normalized_next)
+}
+
+fn normalize_for_match(text: &str) -> String {
+    text.chars().filter_map(normalize_match_char).collect()
+}
+
+fn normalize_match_char(ch: char) -> Option<char> {
+    if ch.is_whitespace()
+        || ch.is_ascii_punctuation()
+        || matches!(
+            ch,
+            '，' | '。' | '！' | '？' | '、' | '；' | '：' | '“' | '”' | '‘' | '’' | '（' | '）'
+                | '《' | '》' | '【' | '】' | '…' | '—' | '－' | '～'
+        )
+    {
+        return None;
+    }
+
+    if matches!(
+        ch,
+        '0'
+            | '1'
+            | '2'
+            | '3'
+            | '4'
+            | '5'
+            | '6'
+            | '7'
+            | '8'
+            | '9'
+            | '零'
+            | '〇'
+            | '一'
+            | '二'
+            | '两'
+            | '三'
+            | '四'
+            | '五'
+            | '六'
+            | '七'
+            | '八'
+            | '九'
+            | '十'
+    ) {
+        return Some('#');
+    }
+
+    if ch.is_ascii_alphabetic() {
+        return Some(ch.to_ascii_lowercase());
+    }
+
+    Some(ch)
 }
 
 #[derive(Debug, Deserialize)]
@@ -561,12 +828,26 @@ struct RtasrResultPayload {
 }
 
 impl RtasrResultPayload {
-    fn text(&self) -> String {
+    fn is_final(&self) -> bool {
         self.cn
             .as_ref()
             .and_then(|cn| cn.st.as_ref())
-            .map(RtasrSentence::text)
-            .unwrap_or_default()
+            .is_some_and(RtasrSentence::is_final)
+    }
+
+    fn tracked_segment(&self) -> Option<TrackedSegment> {
+        let sentence = self.cn.as_ref()?.st.as_ref()?;
+        let text = sentence.text();
+        if text.is_empty() {
+            return None;
+        }
+
+        Some(TrackedSegment {
+            seg_id: self.seg_id,
+            bg: sentence.bg_ms(),
+            ed: sentence.ed_ms(),
+            text,
+        })
     }
 }
 
@@ -577,6 +858,12 @@ struct RtasrCnPayload {
 
 #[derive(Debug, Deserialize)]
 struct RtasrSentence {
+    #[serde(default)]
+    bg: Option<String>,
+    #[serde(default)]
+    ed: Option<String>,
+    #[serde(rename = "type", default)]
+    result_type: Option<String>,
     #[serde(default)]
     rt: Vec<RtasrResultTrack>,
 }
@@ -589,6 +876,18 @@ impl RtasrSentence {
             .filter_map(|word| word.cw.first())
             .map(|candidate| candidate.w.as_str())
             .collect::<String>()
+    }
+
+    fn is_final(&self) -> bool {
+        self.result_type.as_deref() == Some("0")
+    }
+
+    fn bg_ms(&self) -> Option<i64> {
+        self.bg.as_deref()?.parse().ok()
+    }
+
+    fn ed_ms(&self) -> Option<i64> {
+        self.ed.as_deref()?.parse().ok()
     }
 }
 
@@ -613,15 +912,23 @@ fn resample_chunk_to_16khz_bytes(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     let pcm = if sample_rate == 16_000 || samples.is_empty() {
         samples.to_vec()
     } else {
-        let ratio = sample_rate as f64 / 16_000.0;
-        let target_len = (samples.len() as f64 / ratio).ceil() as usize;
+        let source_len = samples.len();
+        let target_len = ((source_len as u64) * 16_000).div_ceil(sample_rate as u64) as usize;
         let mut resampled = Vec::with_capacity(target_len);
+        let last_index = source_len.saturating_sub(1);
+
         for index in 0..target_len {
-            let source_index = (index as f64 * ratio).floor() as usize;
-            if let Some(sample) = samples.get(source_index) {
-                resampled.push(*sample);
-            }
+            let source_position = index as f64 * sample_rate as f64 / 16_000.0;
+            let left_index = source_position.floor() as usize;
+            let left_index = left_index.min(last_index);
+            let right_index = (left_index + 1).min(last_index);
+            let fraction = source_position - left_index as f64;
+            let left = samples[left_index] as f64;
+            let right = samples[right_index] as f64;
+            let interpolated = left + (right - left) * fraction;
+            resampled.push(interpolated.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16);
         }
+
         resampled
     };
 
@@ -719,7 +1026,7 @@ mod tests {
     }
 
     #[test]
-    fn sequential_segments_are_appended_in_seg_id_order() {
+    fn sequential_segments_are_merged_in_seg_id_order_without_duplication() {
         let mut accumulator = ResultAccumulator::default();
         accumulator.apply(RtasrResultPayload {
             seg_id: 5,
@@ -731,7 +1038,7 @@ mod tests {
             cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"什么原因啊兄弟们"}]}]}]}}"#).ok(),
         });
 
-        assert_eq!(text, "为什么什么什么原因啊兄弟们");
+        assert_eq!(text, "为什么什么原因啊兄弟们");
     }
 
     #[test]
@@ -752,6 +1059,158 @@ mod tests {
         });
 
         assert_eq!(text, "第一句第二句话");
+    }
+
+    #[test]
+    fn newer_interim_snapshots_replace_older_ones_even_with_new_seg_id() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 1,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"康神"}]}]}]}}"#).ok(),
+        });
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 2,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"康神开播"}]}]}]}}"#).ok(),
+        });
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 3,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"康神开播了"}]}]}]}}"#).ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 4,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"真的假的"}]}]}]}}"#).ok(),
+        });
+
+        assert_eq!(text, "康神开播了真的假的");
+    }
+
+    #[test]
+    fn interim_snapshots_with_same_bg_replace_previous_draft() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 10,
+            cn: serde_json::from_str(
+                r#"{"st":{"bg":"820","ed":"1200","type":"1","rt":[{"ws":[{"cw":[{"w":"康神开播"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 11,
+            cn: serde_json::from_str(
+                r#"{"st":{"bg":"820","ed":"1560","type":"1","rt":[{"ws":[{"cw":[{"w":"康神开播了"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        assert_eq!(text, "康神开播了");
+    }
+
+    #[test]
+    fn final_segment_replaces_matching_interim_draft() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 5,
+            cn: serde_json::from_str(
+                r#"{"st":{"bg":"820","ed":"1200","type":"1","rt":[{"ws":[{"cw":[{"w":"康神开播"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 5,
+            cn: serde_json::from_str(
+                r#"{"st":{"bg":"820","ed":"1560","type":"0","rt":[{"ws":[{"cw":[{"w":"康神开播了"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        assert_eq!(text, "康神开播了");
+    }
+
+    #[test]
+    fn single_character_overlap_is_merged_once() {
+        assert_eq!(merge_with_overlap("康神开播了", "了真的假的"), "康神开播了真的假的");
+    }
+
+    #[test]
+    fn longer_snapshot_replaces_previous_combined_text() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 1,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"风格这一块实现主要是由skill实现的，主要涉及一些应用场景是什么样"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 2,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"风格这一块实现主要是由skill实现的，主要涉及一些应用场景是什么呀"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        assert_eq!(text, "风格这一块实现主要是由skill实现的，主要涉及一些应用场景是什么呀");
+    }
+
+    #[test]
+    fn accumulated_interim_text_is_replaced_when_new_snapshot_restarts_from_beginning() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 1,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"该功能主要借助可扩展的那个skill模块，实现对语音识别所输出的文字进行智能化"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 2,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"呃就是核心就是将一些口语化碎片化的识别文本，按照不同的场景"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 3,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"该功能主要借助可扩展的那个skill模块，实现对语音识别所输出的文字进行智能化风格的改写，其核心就是将一些口语化碎片化的识别文本，按照不同的场景转换为更规范的文本"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        assert_eq!(
+            text,
+            "该功能主要借助可扩展的那个skill模块，实现对语音识别所输出的文字进行智能化风格的改写，其核心就是将一些口语化碎片化的识别文本，按照不同的场景转换为更规范的文本"
+        );
+    }
+
+    #[test]
+    fn redundant_tail_inside_live_snapshot_is_ignored() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 1,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"该功能主要是借助可扩展的sqw模块实现对语音识别所输入的文字智能化风格改写，就是将一些口语化碎片化的识别文本转换成规范的文本，然后已经内置了4种典型的应用场景，比如通用润色呀邮件撰写问候消息，专业回复，后续还将支持用户自定义的skill来实现不同的应用场景。"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 2,
+            cn: serde_json::from_str(
+                r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"已经内置了四种典型的应用场景，比如通用润色呀、邮件撰写问候消息专业回复，后续还将支持用户自定义的skill来实现不同"}]}]}]}}"#,
+            )
+            .ok(),
+        });
+
+        assert_eq!(
+            text,
+            "该功能主要是借助可扩展的sqw模块实现对语音识别所输入的文字智能化风格改写，就是将一些口语化碎片化的识别文本转换成规范的文本，然后已经内置了4种典型的应用场景，比如通用润色呀邮件撰写问候消息，专业回复，后续还将支持用户自定义的skill来实现不同的应用场景。"
+        );
     }
 
     #[test]
@@ -792,5 +1251,59 @@ mod tests {
         );
 
         assert!(!is_retryable_session_start_error(&error));
+    }
+
+    #[test]
+    fn resampling_upsamples_with_linear_interpolation() {
+        let bytes = resample_chunk_to_16khz_bytes(&[0, 1_000, 2_000], 8_000);
+        let samples = bytes
+            .chunks_exact(2)
+            .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+
+        assert_eq!(samples, vec![0, 500, 1_000, 1_500, 2_000, 2_000]);
+    }
+
+    #[test]
+    fn resampling_keeps_16khz_audio_unchanged() {
+        let original = [120, -340, 560, -780];
+        let bytes = resample_chunk_to_16khz_bytes(&original, 16_000);
+        let samples = bytes
+            .chunks_exact(2)
+            .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+
+        assert_eq!(samples, original);
+    }
+
+    #[test]
+    fn unchanged_partial_snapshot_is_not_emitted_again() {
+        let raw = r#"{
+            "action":"result",
+            "code":"0",
+            "data":"{\"cn\":{\"st\":{\"type\":\"1\",\"rt\":[{\"ws\":[{\"cw\":[{\"w\":\"一二三\"}]}]}]}},\"seg_id\":1}",
+            "desc":"success"
+        }"#;
+        let mut accumulator = ResultAccumulator::default();
+
+        assert_eq!(process_server_message(raw, &mut accumulator).unwrap().as_deref(), Some("一二三"));
+        assert_eq!(process_server_message(raw, &mut accumulator).unwrap(), None);
+    }
+
+    #[test]
+    fn committing_previous_live_segment_keeps_only_new_tail() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 1,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"一二三"}]}]}]}}"#).ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 2,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"二三四"}]}]}]}}"#).ok(),
+        });
+
+        assert_eq!(text, "一二三四");
+        assert_eq!(accumulator.final_segments.get(&1).map(String::as_str), Some("一二三"));
     }
 }

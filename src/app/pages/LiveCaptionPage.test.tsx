@@ -146,6 +146,40 @@ describe('LiveCaptionPage', () => {
 
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
+
+  test('slides long captions forward without retyping the whole tail', async () => {
+    render(<LiveCaptionPage />);
+
+    await act(async () => {
+      voiceListener?.({
+        payload: {
+          status: 'Listening',
+          transcript_partial: '12345678901234567890',
+          transcript_final: null,
+          error_code: null,
+          message: null
+        }
+      });
+    });
+
+    await revealAllText('12345678901234567890');
+    expect(screen.getByText('12345678901234567890')).toBeInTheDocument();
+
+    const shifted = '...23456789012345678901';
+    await act(async () => {
+      voiceListener?.({
+        payload: {
+          status: 'Listening',
+          transcript_partial: '123456789012345678901',
+          transcript_final: null,
+          error_code: null,
+          message: null
+        }
+      });
+    });
+
+    expect(screen.getByText(shifted)).toBeInTheDocument();
+  });
 });
 
 async function revealAllText(text: string) {
