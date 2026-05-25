@@ -186,6 +186,8 @@ describe('FlowType settings shell', () => {
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
+    expect(screen.queryByRole('checkbox', { name: 'Keep floating window on top' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Enable floating window animation' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear history' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));

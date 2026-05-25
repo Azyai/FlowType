@@ -147,6 +147,13 @@ pub struct AppSettings {
     pub locale_preference: LocalePreference,
 }
 
+impl AppSettings {
+    pub(crate) fn enforce_hidden_defaults(&mut self) {
+        self.floating_window_always_on_top = true;
+        self.floating_window_animation_enabled = true;
+    }
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -201,6 +208,7 @@ impl ConfigStore {
             Ok(mut settings) => {
                 settings.clipboard_restore = ClipboardRestore::Never;
                 normalize_hotkeys(&mut settings, has_toggle_hotkey);
+                settings.enforce_hidden_defaults();
                 Ok(settings)
             }
             Err(_) => {
@@ -213,6 +221,9 @@ impl ConfigStore {
     }
 
     pub fn save(&self, settings: &AppSettings) -> AppResult<()> {
+        let mut normalized = settings.clone();
+        normalized.enforce_hidden_defaults();
+
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -222,7 +233,7 @@ impl ConfigStore {
         }
 
         let temp_path = self.path.with_extension("json.tmp");
-        let text = serde_json::to_string_pretty(settings)?;
+        let text = serde_json::to_string_pretty(&normalized)?;
         fs::write(&temp_path, text)?;
 
         if self.path.exists() {
@@ -387,6 +398,46 @@ mod tests {
         let loaded = store.load().unwrap();
 
         assert_eq!(loaded, settings);
+    }
+
+    #[test]
+    fn hidden_floating_window_flags_are_forced_on_load_and_save() {
+        let path = test_path("hidden-floating-defaults");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{
+              "hotkey": "Ctrl+Alt+V",
+              "input_mode": "hold_to_talk",
+              "toggle_hotkey": "Ctrl+Alt+M",
+              "output_style": "raw",
+              "clipboard_restore": "never",
+              "floating_window_position": "bottom_right",
+              "show_floating_window": true,
+              "floating_window_always_on_top": false,
+              "floating_window_animation_enabled": false,
+              "save_history": true,
+              "auto_start": false,
+              "update_channel": "stable",
+              "update_manifest_url": "mock://updates/stable.json",
+              "auto_check_update": false
+            }"#,
+        )
+        .unwrap();
+        let store = ConfigStore::new(&path);
+
+        let loaded = store.load().unwrap();
+        assert!(loaded.floating_window_always_on_top);
+        assert!(loaded.floating_window_animation_enabled);
+
+        let mut to_save = loaded.clone();
+        to_save.floating_window_always_on_top = false;
+        to_save.floating_window_animation_enabled = false;
+        store.save(&to_save).unwrap();
+
+        let reloaded = store.load().unwrap();
+        assert!(reloaded.floating_window_always_on_top);
+        assert!(reloaded.floating_window_animation_enabled);
     }
 
     #[test]

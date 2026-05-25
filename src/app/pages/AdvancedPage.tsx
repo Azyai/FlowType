@@ -81,26 +81,6 @@ export function AdvancedPage({
       <label className="switch-row">
         <input
           type="checkbox"
-          checked={settings.floating_window_always_on_top}
-          onChange={(event) =>
-            setSettings({ ...settings, floating_window_always_on_top: event.target.checked })
-          }
-        />
-        <span>{t('advanced.floatingAlwaysOnTop')}</span>
-      </label>
-      <label className="switch-row">
-        <input
-          type="checkbox"
-          checked={settings.floating_window_animation_enabled}
-          onChange={(event) =>
-            setSettings({ ...settings, floating_window_animation_enabled: event.target.checked })
-          }
-        />
-        <span>{t('advanced.floatingAnimation')}</span>
-      </label>
-      <label className="switch-row">
-        <input
-          type="checkbox"
           checked={settings.vad_enabled}
           onChange={(event) => setSettings({ ...settings, vad_enabled: event.target.checked })}
         />
