@@ -23,7 +23,7 @@ export const defaultSettings: AppSettings = {
   floating_window_animation_enabled: true,
   save_history: true,
   history_retention_days: 14,
-  vad_enabled: false,
+  vad_enabled: true,
   hotwords_enabled: false,
   min_recording_ms: 500,
   max_recording_ms: 60000,

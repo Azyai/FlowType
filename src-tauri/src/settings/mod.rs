@@ -144,7 +144,7 @@ pub struct AppSettings {
     pub save_history: bool,
     #[serde(default = "default_history_retention_days")]
     pub history_retention_days: u16,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub vad_enabled: bool,
     #[serde(default)]
     pub hotwords_enabled: bool,
@@ -166,6 +166,7 @@ impl AppSettings {
     pub(crate) fn enforce_hidden_defaults(&mut self) {
         self.floating_window_always_on_top = true;
         self.floating_window_animation_enabled = true;
+        self.vad_enabled = true;
     }
 }
 
@@ -187,7 +188,7 @@ impl Default for AppSettings {
             floating_window_animation_enabled: true,
             save_history: true,
             history_retention_days: 14,
-            vad_enabled: false,
+            vad_enabled: true,
             hotwords_enabled: false,
             min_recording_ms: 500,
             max_recording_ms: 60_000,
@@ -338,7 +339,7 @@ mod tests {
         assert!(settings.floating_window_animation_enabled);
         assert!(settings.save_history);
         assert_eq!(settings.history_retention_days, 14);
-        assert!(!settings.vad_enabled);
+        assert!(settings.vad_enabled);
         assert!(!settings.hotwords_enabled);
         assert_eq!(settings.min_recording_ms, 500);
         assert_eq!(settings.max_recording_ms, 60_000);
@@ -435,6 +436,7 @@ mod tests {
               "show_floating_window": true,
               "floating_window_always_on_top": false,
               "floating_window_animation_enabled": false,
+              "vad_enabled": false,
               "save_history": true,
               "auto_start": false,
               "update_channel": "stable",
@@ -448,15 +450,18 @@ mod tests {
         let loaded = store.load().unwrap();
         assert!(loaded.floating_window_always_on_top);
         assert!(loaded.floating_window_animation_enabled);
+        assert!(loaded.vad_enabled);
 
         let mut to_save = loaded.clone();
         to_save.floating_window_always_on_top = false;
         to_save.floating_window_animation_enabled = false;
+        to_save.vad_enabled = false;
         store.save(&to_save).unwrap();
 
         let reloaded = store.load().unwrap();
         assert!(reloaded.floating_window_always_on_top);
         assert!(reloaded.floating_window_animation_enabled);
+        assert!(reloaded.vad_enabled);
     }
 
     #[test]

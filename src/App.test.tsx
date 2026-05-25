@@ -22,7 +22,7 @@ const settings: AppSettings = {
   floating_window_animation_enabled: true,
   save_history: true,
   history_retention_days: 14,
-  vad_enabled: false,
+  vad_enabled: true,
   hotwords_enabled: false,
   min_recording_ms: 500,
   max_recording_ms: 60000,
@@ -190,6 +190,7 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     expect(screen.getByText('Output')).toBeInTheDocument();
     expect(screen.getByText('Display and floating window')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Enable VAD' })).not.toBeInTheDocument();
     expect(screen.queryByText('Formal writing skill')).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Email drafting' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');

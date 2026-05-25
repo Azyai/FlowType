@@ -204,16 +204,6 @@ export function AdvancedPage({
           <label className="switch-row">
             <input
               type="checkbox"
-              checked={settings.vad_enabled}
-              onChange={(event) => updateSettings({ vad_enabled: event.target.checked })}
-              aria-label={t('advanced.vad')}
-            />
-            <span>{t('advanced.vad')}</span>
-          </label>
-
-          <label className="switch-row">
-            <input
-              type="checkbox"
               checked={settings.hotwords_enabled}
               onChange={(event) => updateSettings({ hotwords_enabled: event.target.checked })}
               aria-label={t('advanced.hotwords')}

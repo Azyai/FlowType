@@ -104,6 +104,11 @@ export function LiveCaptionPage() {
       return;
     }
 
+    if (isRollingCaption(displayText, targetText)) {
+      setDisplayText(targetText);
+      return;
+    }
+
     if (!targetText.startsWith(displayText)) {
       const prefixLength = sharedPrefixLength(displayText, targetText);
       setDisplayText(targetText.slice(0, prefixLength));
@@ -178,6 +183,10 @@ function formatCaptionText(text: string) {
     return chars.join('');
   }
   return `...${chars.slice(-CAPTION_TAIL_LENGTH).join('')}`;
+}
+
+function isRollingCaption(previous: string, next: string) {
+  return previous.startsWith('...') || next.startsWith('...');
 }
 
 function swallowAsync(result: Promise<unknown> | unknown) {
