@@ -1,6 +1,7 @@
 # FlowType
 
 FlowType 是一个基于 `Tauri 2 + React 19 + Vite 6` 的 Windows 桌面语音输入应用，当前已经完成语音输入相关的核心设置与历史记录管理界面。
+语音识别ASR使用的是讯飞开放平台
 
 项目目前主要围绕以下 3 个页面展开：
 项目讲解视频在：【1】 https://www.bilibili.com/video/BV1KnGo6uEQQ/?share_source=copy_web&vd_source=8bc6e2289864a048e3a93cb7dace78f1
