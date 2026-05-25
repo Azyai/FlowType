@@ -37,7 +37,8 @@ impl AppState {
             .map(|settings| settings.clone())
     }
 
-    pub fn save_settings(&self, settings: AppSettings) -> AppResult<AppSettings> {
+    pub fn save_settings(&self, mut settings: AppSettings) -> AppResult<AppSettings> {
+        settings.enforce_hidden_defaults();
         self.config_store.save(&settings)?;
         *self.settings.lock().map_err(|_| AppError::StateLock)? = settings.clone();
         Ok(settings)

@@ -30,7 +30,8 @@ const settings: AppSettings = {
   update_channel: 'stable',
   update_manifest_url: 'mock://updates/stable.json',
   auto_check_update: false,
-  locale_preference: 'auto'
+  locale_preference: 'auto',
+  formal_scene: 'general'
 };
 
 const historyItems = Array.from({ length: 25 }, (_, index) => ({
@@ -124,6 +125,10 @@ describe('FlowType settings shell', () => {
     expect(screen.getByLabelText('Toggle recording hotkey')).toBeInTheDocument();
   });
 
+  test('default test settings include formal_scene', () => {
+    expect(settings.formal_scene).toBe('general');
+  });
+
   test('shows only user-facing settings pages in navigation', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -183,9 +188,21 @@ describe('FlowType settings shell', () => {
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getByText('Output')).toBeInTheDocument();
+    expect(screen.getByText('Display and floating window')).toBeInTheDocument();
+    expect(screen.queryByText('Formal writing skill')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Email drafting' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
+    const emailSkill = await screen.findByRole('radio', { name: 'Email drafting' });
+    expect(await screen.findByText('Active in formal mode')).toBeInTheDocument();
+    await user.click(emailSkill);
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
+    await user.click(screen.getByRole('checkbox', { name: 'Check for updates automatically' }));
+    expect(screen.getByLabelText('Floating window position')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Keep floating window on top' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Enable floating window animation' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
+    expect(screen.queryByLabelText('Floating window position')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear history' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
@@ -194,7 +211,9 @@ describe('FlowType settings shell', () => {
       expect(bridge.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           output_style: 'formal',
+          formal_scene: 'email',
           history_retention_days: 30,
+          auto_check_update: true,
           show_floating_window: false
         })
       );

@@ -28,6 +28,14 @@ pub fn transform_output_text(raw_text: &str, output_style: &OutputStyle) -> Stri
     }
 }
 
+pub fn fallback_clean_text(raw_text: &str) -> String {
+    clean_text(&normalize_line_endings(raw_text))
+}
+
+pub fn fallback_formal_text(raw_text: &str) -> String {
+    formalize_text(&normalize_line_endings(raw_text))
+}
+
 fn clean_text(text: &str) -> String {
     let lines = text
         .lines()
@@ -205,5 +213,19 @@ mod tests {
         let transformed = transform_output_text("can you open the document?", &OutputStyle::Formal);
 
         assert_eq!(transformed, "Can you open the document?");
+    }
+
+    #[test]
+    fn fallback_clean_text_uses_same_local_cleanup_rules() {
+        let transformed = fallback_clean_text("嗯，  帮我   打开   文档  ");
+
+        assert_eq!(transformed, "帮我 打开 文档");
+    }
+
+    #[test]
+    fn fallback_formal_text_uses_same_local_formal_rules() {
+        let transformed = fallback_formal_text("这个 API response format 我晚点再补文档");
+
+        assert_eq!(transformed, "这个 API response format 我晚点再补文档。");
     }
 }

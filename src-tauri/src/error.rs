@@ -27,6 +27,8 @@ pub enum AppError {
     AsrServiceUnavailable(String),
     #[error("voice input operation failed: {0}")]
     Voice(String),
+    #[error("LLM request failed: {0}")]
+    Llm(String),
     #[error("audio capture failed: {0}")]
     Audio(String),
     #[error("internal state lock failed")]
@@ -45,6 +47,7 @@ impl From<AppError> for ErrorResponse {
             AppError::AsrConfigMissing(_) => "ASR_CONFIG_MISSING",
             AppError::AsrServiceUnavailable(_) => "ASR_SERVICE_UNAVAILABLE",
             AppError::Voice(_) => "VOICE_INPUT",
+            AppError::Llm(_) => "LLM",
             AppError::Audio(_) => "AUDIO_CAPTURE",
             AppError::StateLock => "STATE_LOCK",
         };

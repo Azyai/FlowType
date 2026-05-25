@@ -3,6 +3,7 @@ mod asr;
 mod commands;
 mod desktop;
 mod error;
+mod llm;
 mod settings;
 mod storage;
 mod updates;
