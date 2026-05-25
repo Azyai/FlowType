@@ -173,7 +173,7 @@
 }
 
 .history-list-scroll {
-  max-height: 640px;
+  max-height: 328px;
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -289,11 +289,6 @@
 }
 
 .history-pagination {
-  display: grid;
-  gap: 12px;
-}
-
-.history-page-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -305,6 +300,7 @@
   color: #6b7280;
   font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .history-page-buttons {
@@ -312,6 +308,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
 }
 
 .history-page-button {
@@ -340,9 +337,9 @@
 
 .history-page-jump {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  flex: 0 0 auto;
 }
 
 .history-page-jump label {
@@ -445,11 +442,11 @@ nav::-webkit-scrollbar-thumb:hover {
     justify-content: flex-start;
   }
 
-  .history-page-controls {
-    align-items: stretch;
+  .history-page-buttons {
+    width: 100%;
   }
 
-  .history-page-buttons {
+  .history-page-jump {
     width: 100%;
   }
 }

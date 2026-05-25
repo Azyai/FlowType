@@ -268,51 +268,49 @@ export function HistoryPage({
           </div>
 
           <div className="history-pagination">
-            <div className="history-page-controls">
-              <span className="history-page-summary">
-                {t('history.pageLabel', { current: currentPage, total: totalPages })}
-              </span>
+            <span className="history-page-summary">
+              {t('history.pageLabel', { current: currentPage, total: totalPages })}
+            </span>
 
-              <div className="history-page-buttons">
-                <button
-                  type="button"
-                  className="secondary-button history-page-button"
-                  onClick={() => void loadHistory(currentPage - 1)}
-                  disabled={loading || clearing || currentPage === 1}
-                >
-                  <ChevronLeft aria-hidden="true" />
-                  {t('history.previousPage')}
-                </button>
+            <div className="history-page-buttons">
+              <button
+                type="button"
+                className="secondary-button history-page-button"
+                onClick={() => void loadHistory(currentPage - 1)}
+                disabled={loading || clearing || currentPage === 1}
+              >
+                <ChevronLeft aria-hidden="true" />
+                {t('history.previousPage')}
+              </button>
 
-                {paginationItems.map((item, index) =>
-                  item === 'ellipsis' ? (
-                    <span key={`ellipsis-${index}`} className="history-page-ellipsis" aria-hidden="true">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`secondary-button history-page-button${item === currentPage ? ' active' : ''}`}
-                      onClick={() => void loadHistory(item)}
-                      disabled={loading || clearing || item === currentPage}
-                      aria-current={item === currentPage ? 'page' : undefined}
-                    >
-                      {item}
-                    </button>
-                  )
-                )}
+              {paginationItems.map((item, index) =>
+                item === 'ellipsis' ? (
+                  <span key={`ellipsis-${index}`} className="history-page-ellipsis" aria-hidden="true">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`secondary-button history-page-button${item === currentPage ? ' active' : ''}`}
+                    onClick={() => void loadHistory(item)}
+                    disabled={loading || clearing || item === currentPage}
+                    aria-current={item === currentPage ? 'page' : undefined}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
 
-                <button
-                  type="button"
-                  className="secondary-button history-page-button"
-                  onClick={() => void loadHistory(currentPage + 1)}
-                  disabled={loading || clearing || currentPage === totalPages}
-                >
-                  {t('history.nextPage')}
-                  <ChevronRight aria-hidden="true" />
-                </button>
-              </div>
+              <button
+                type="button"
+                className="secondary-button history-page-button"
+                onClick={() => void loadHistory(currentPage + 1)}
+                disabled={loading || clearing || currentPage === totalPages}
+              >
+                {t('history.nextPage')}
+                <ChevronRight aria-hidden="true" />
+              </button>
             </div>
 
             <div className="history-page-jump">
