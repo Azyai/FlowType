@@ -30,12 +30,6 @@ const formalSceneOptions: Array<{
   }
 ];
 
-const outputStyleDescriptionKeys: Record<AppSettings['output_style'], TranslationKey> = {
-  raw: 'advanced.outputStyleRawHint',
-  clean: 'advanced.outputStyleCleanHint',
-  formal: 'advanced.outputStyleFormalHint'
-};
-
 export function AdvancedPage({
   settings,
   setSettings,
@@ -52,7 +46,6 @@ export function AdvancedPage({
   const { t } = useI18n();
   const formalModeEnabled = settings.output_style === 'formal';
   const recordingRangeInvalid = settings.max_recording_ms < settings.min_recording_ms;
-  const outputStyleDescriptionKey = outputStyleDescriptionKeys[settings.output_style];
 
   const updateSettings = (patch: Partial<AppSettings>) => {
     setSettings({ ...settings, ...patch });
@@ -81,17 +74,10 @@ export function AdvancedPage({
           </select>
         </label>
 
-        <p className="helper-text">{t(outputStyleDescriptionKey)}</p>
-        <p className="helper-text">{t('advanced.languageConsistencyHint')}</p>
-
         {formalModeEnabled && (
-          <fieldset className="skill-fieldset" aria-describedby="formal-skill-description">
+          <fieldset className="skill-fieldset">
             <legend>{t('advanced.formalSkill')}</legend>
             <div className="skill-fieldset-header">
-              <div className="skill-fieldset-copy">
-                <p id="formal-skill-description">{t('advanced.formalSkillHint')}</p>
-                <p>{t('advanced.formalSkillLanguageHint')}</p>
-              </div>
               <span className="skill-state-badge is-active">{t('advanced.skillEnabled')}</span>
             </div>
 

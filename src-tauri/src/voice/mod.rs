@@ -11,7 +11,7 @@ use crate::{
     storage::NewTranscriptHistory,
     voice::{
         audio::AudioRecorder,
-        output::transform_output_text,
+        output::{fallback_clean_text, fallback_formal_text, transform_output_text},
         rtasr::StreamingRecognizer,
         state::{StopDecision, VoiceSessionEvent, VoiceStateMachine, VoiceStatus, VoiceTrigger},
     },
@@ -423,6 +423,13 @@ struct OutputRewrite {
 }
 
 fn rewrite_output_text(raw_text: &str, settings: &AppSettings) -> OutputRewrite {
+    rewrite_output_text_with(raw_text, settings, llm::rewrite_text)
+}
+
+fn rewrite_output_text_with<F>(raw_text: &str, settings: &AppSettings, rewrite_fn: F) -> OutputRewrite
+where
+    F: FnOnce(&str, OutputStyle, crate::settings::FormalScene) -> AppResult<llm::RewriteResult>,
+{
     if matches!(settings.output_style, OutputStyle::Raw) {
         return OutputRewrite {
             final_text: transformed_output_text(raw_text, &settings.output_style),
@@ -434,19 +441,30 @@ fn rewrite_output_text(raw_text: &str, settings: &AppSettings) -> OutputRewrite 
         };
     }
 
-    match llm::rewrite_text(raw_text, settings.output_style, settings.formal_scene) {
-        Ok(result) => OutputRewrite {
+    match rewrite_fn(raw_text, settings.output_style, settings.formal_scene) {
+        Ok(result) => {
+            let output = OutputRewrite {
             final_text: result.text.trim().to_string(),
             provider: result.provider.to_string(),
             model: result.model.map(|model| model.as_str().to_string()),
             formal_scene: result.scene.map(formal_scene_label),
             latency_ms: result.latency_ms.min(i64::MAX as u128) as i64,
             fallback_used: result.fallback_used,
-        },
+            };
+            log::info!(
+                "rewrite completed provider={} model={:?} scene={:?} latency_ms={} fallback_used={}",
+                output.provider,
+                output.model,
+                output.formal_scene,
+                output.latency_ms,
+                output.fallback_used
+            );
+            output
+        }
         Err(error) => {
             log::warn!("llm rewrite failed, falling back to native transform: {error}");
             OutputRewrite {
-                final_text: transformed_output_text(raw_text, &settings.output_style),
+                final_text: fallback_output_text(raw_text, &settings.output_style),
                 provider: "native".to_string(),
                 model: None,
                 formal_scene: if matches!(settings.output_style, OutputStyle::Formal) {
@@ -458,6 +476,14 @@ fn rewrite_output_text(raw_text: &str, settings: &AppSettings) -> OutputRewrite 
                 fallback_used: true,
             }
         }
+    }
+}
+
+fn fallback_output_text(raw_text: &str, output_style: &OutputStyle) -> String {
+    match output_style {
+        OutputStyle::Raw => transformed_output_text(raw_text, output_style),
+        OutputStyle::Clean => fallback_clean_text(raw_text),
+        OutputStyle::Formal => fallback_formal_text(raw_text),
     }
 }
 
@@ -608,6 +634,39 @@ mod tests {
         assert_eq!(rewrite.formal_scene, None);
         assert_eq!(rewrite.latency_ms, 0);
         assert!(!rewrite.fallback_used);
+    }
+
+    #[test]
+    fn clean_mode_falls_back_to_local_cleanup_when_llm_fails() {
+        let mut settings = AppSettings::default();
+        settings.output_style = OutputStyle::Clean;
+
+        let rewrite = rewrite_output_text_with("嗯，  帮我   打开   文档  ", &settings, |_, _, _| {
+            Err(AppError::Llm("mock clean failure".to_string()))
+        });
+
+        assert_eq!(rewrite.final_text, "帮我 打开 文档");
+        assert_eq!(rewrite.provider, "native");
+        assert_eq!(rewrite.model, None);
+        assert_eq!(rewrite.formal_scene, None);
+        assert!(rewrite.fallback_used);
+    }
+
+    #[test]
+    fn formal_mode_falls_back_to_local_formalization_when_llm_fails() {
+        let mut settings = AppSettings::default();
+        settings.output_style = OutputStyle::Formal;
+        settings.formal_scene = crate::settings::FormalScene::ProfessionalReply;
+
+        let rewrite = rewrite_output_text_with("这个 API response format 我晚点再补文档", &settings, |_, _, _| {
+            Err(AppError::Llm("mock formal failure".to_string()))
+        });
+
+        assert_eq!(rewrite.final_text, "这个 API response format 我晚点再补文档。");
+        assert_eq!(rewrite.provider, "native");
+        assert_eq!(rewrite.model, None);
+        assert_eq!(rewrite.formal_scene.as_deref(), Some("professional_reply"));
+        assert!(rewrite.fallback_used);
     }
 
     #[test]

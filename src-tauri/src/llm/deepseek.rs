@@ -87,14 +87,6 @@ pub fn rewrite_text(model: DeepSeekModel, system_prompt: &str, user_text: &str) 
         .send_json(ureq::json!(request))
         .map_err(map_transport_error)?;
 
-    if response.status() != 200 {
-        return Err(AppError::Llm(format!(
-            "DeepSeek returned HTTP {} from {}.",
-            response.status(),
-            DEEPSEEK_BASE_URL
-        )));
-    }
-
     let payload: ChatCompletionsResponse = response
         .into_json()
         .map_err(|error| AppError::Llm(format!("DeepSeek returned invalid JSON: {error}")))?;
@@ -116,11 +108,29 @@ pub fn rewrite_text(model: DeepSeekModel, system_prompt: &str, user_text: &str) 
 
 fn map_transport_error(error: ureq::Error) -> AppError {
     match error {
-        ureq::Error::Status(status, response) => AppError::Llm(format!(
-            "DeepSeek request failed with HTTP {status}: {}",
-            response.status_text()
-        )),
-        ureq::Error::Transport(transport) => AppError::Llm(format!("DeepSeek transport error: {transport}")),
+        ureq::Error::Status(status, response) => {
+            let reason = response.status_text().trim().to_string();
+            match status {
+                401 => AppError::Llm(format!(
+                    "DeepSeek authentication failed with HTTP 401 from {DEEPSEEK_BASE_URL}: {reason}"
+                )),
+                429 => AppError::Llm(format!(
+                    "DeepSeek rate limit reached with HTTP 429 from {DEEPSEEK_BASE_URL}: {reason}"
+                )),
+                _ => AppError::Llm(format!(
+                    "DeepSeek request failed with HTTP {status} from {DEEPSEEK_BASE_URL}: {reason}"
+                )),
+            }
+        }
+        ureq::Error::Transport(transport) => {
+            let message = transport.to_string();
+            if message.to_ascii_lowercase().contains("timed out") || message.to_ascii_lowercase().contains("timeout")
+            {
+                AppError::Llm(format!("DeepSeek request timed out while contacting {DEEPSEEK_BASE_URL}."))
+            } else {
+                AppError::Llm(format!("DeepSeek transport error while contacting {DEEPSEEK_BASE_URL}: {message}"))
+            }
+        }
     }
 }
 

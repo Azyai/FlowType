@@ -15,6 +15,7 @@ Rules:
 - If the ASR input is mixed Chinese and English, keep the mixed-language structure.
 - Do not invent facts.
 - Do not summarize.
+- Do not translate the original text into another language.
 - Return only the cleaned text."#;
 
 const FORMAL_SYSTEM_PROMPT_PREFIX: &str = r#"You rewrite ASR dictation into formal written text.
@@ -28,6 +29,7 @@ Global rules:
 - If the ASR input is mixed Chinese and English, keep the mixed-language structure.
 - Do not invent facts.
 - Do not add markdown, titles, or explanations.
+- Do not translate the original text into another language.
 - Return only the final text.
 
 Scene skill:"#;
@@ -49,7 +51,7 @@ mod tests {
         let prompt = formal_system_prompt(FormalScene::Greeting);
 
         assert!(prompt.contains("Scene skill:"));
-        assert!(prompt.contains("friendly greeting"));
+        assert!(prompt.contains("Skill: Greeting rewrite"));
         assert!(prompt.contains("Keep the output language aligned with the ASR input language."));
     }
 }

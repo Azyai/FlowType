@@ -749,4 +749,54 @@ mod tests {
         assert_eq!(page.items[0].rewrite_latency_ms, 512);
         assert!(page.items[0].rewrite_fallback_used);
     }
+
+    #[test]
+    fn old_transcript_history_schema_is_upgraded_without_errors() {
+        let path = test_db_path("legacy-schema-upgrade");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE migration_history (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    applied_at TEXT NOT NULL
+                );
+                INSERT INTO migration_history (id, name, applied_at) VALUES (1, 'create_app_metadata', '0');
+                INSERT INTO migration_history (id, name, applied_at) VALUES (2, 'create_transcript_history', '0');
+                INSERT INTO migration_history (id, name, applied_at) VALUES (3, 'remove_failed_transcript_history', '0');
+
+                CREATE TABLE app_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE transcript_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    raw_text TEXT NOT NULL,
+                    final_text TEXT NOT NULL,
+                    output_style TEXT NOT NULL,
+                    recognition_started_at INTEGER NOT NULL,
+                    recognition_duration_ms INTEGER NOT NULL,
+                    injected INTEGER NOT NULL,
+                    error_code TEXT,
+                    error_summary TEXT,
+                    created_at INTEGER NOT NULL
+                );
+                "#,
+            )
+            .unwrap();
+        drop(connection);
+
+        let database = Database::open(&path).unwrap();
+        let health = database.health();
+
+        assert!(health.ok);
+        assert_eq!(health.applied_migrations, 4);
+    }
 }
