@@ -94,7 +94,7 @@ describe('FlowType settings shell', () => {
     });
     vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
     vi.spyOn(bridge, 'deleteHistoryItem').mockResolvedValue({ deleted_count: 1 });
-    vi.spyOn(bridge, 'getHistory').mockImplementation(async (limit, offset) => ({
+    vi.spyOn(bridge, 'getHistory').mockImplementation(async (limit = 20, offset = 0) => ({
       items: historyItems.slice(offset, offset + limit),
       total: historyItems.length,
       limit,
