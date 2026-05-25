@@ -13,7 +13,7 @@ export const defaultSettings: AppSettings = {
   toggle_hotkey: 'Ctrl+Alt+M',
   rtasr_app_id: '',
   rtasr_api_key: '',
-  rtasr_language: 'zh_cn',
+  rtasr_language: 'zh_en',
   rtasr_timeout_ms: 10000,
   output_style: 'raw',
   clipboard_restore: 'never',

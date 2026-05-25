@@ -34,7 +34,7 @@ pub enum RtasrLanguage {
 }
 
 fn default_rtasr_language() -> RtasrLanguage {
-    RtasrLanguage::ZhCn
+    RtasrLanguage::ZhEn
 }
 
 fn default_rtasr_timeout_ms() -> u64 {
@@ -155,7 +155,7 @@ impl Default for AppSettings {
             toggle_hotkey: default_toggle_hotkey(),
             rtasr_app_id: String::new(),
             rtasr_api_key: String::new(),
-            rtasr_language: RtasrLanguage::ZhCn,
+            rtasr_language: RtasrLanguage::ZhEn,
             rtasr_timeout_ms: 10_000,
             output_style: OutputStyle::Raw,
             clipboard_restore: ClipboardRestore::Never,
@@ -301,7 +301,7 @@ mod tests {
         assert_eq!(settings.hotkey, "Ctrl+Alt+V");
         assert_eq!(settings.input_mode, InputMode::HoldToTalk);
         assert_eq!(settings.toggle_hotkey, "Ctrl+Alt+M");
-        assert_eq!(settings.rtasr_language, RtasrLanguage::ZhCn);
+        assert_eq!(settings.rtasr_language, RtasrLanguage::ZhEn);
         assert_eq!(settings.rtasr_timeout_ms, 10_000);
         assert_eq!(settings.output_style, OutputStyle::Raw);
         assert_eq!(settings.clipboard_restore, ClipboardRestore::Never);
