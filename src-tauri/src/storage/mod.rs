@@ -39,6 +39,15 @@ const MIGRATIONS: &[Migration] = &[
                 ON transcript_history(created_at);
         "#,
     },
+    Migration {
+        id: 3,
+        name: "remove_failed_transcript_history",
+        sql: r#"
+            DELETE FROM transcript_history
+            WHERE COALESCE(TRIM(error_code), '') <> ''
+               OR COALESCE(TRIM(error_summary), '') <> '';
+        "#,
+    },
 ];
 
 #[derive(Debug)]
@@ -259,6 +268,8 @@ impl Database {
                 error_summary,
                 created_at
             FROM transcript_history
+            WHERE COALESCE(TRIM(error_code), '') = ''
+              AND COALESCE(TRIM(error_summary), '') = ''
             ORDER BY created_at DESC, id DESC
             LIMIT ?1 OFFSET ?2
             "#,
@@ -278,7 +289,16 @@ impl Database {
             })
         })?;
         let items = rows.collect::<Result<Vec<_>, _>>()?;
-        let total = connection.query_row("SELECT COUNT(*) FROM transcript_history", [], |row| row.get(0))?;
+        let total = connection.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM transcript_history
+            WHERE COALESCE(TRIM(error_code), '') = ''
+              AND COALESCE(TRIM(error_summary), '') = ''
+            "#,
+            [],
+            |row| row.get(0),
+        )?;
         Ok(TranscriptHistoryPage {
             items,
             total,
@@ -339,7 +359,7 @@ mod tests {
 
         assert!(path.exists());
         assert!(health.ok);
-        assert_eq!(health.applied_migrations, 2);
+        assert_eq!(health.applied_migrations, 3);
     }
 
     #[test]
@@ -350,7 +370,7 @@ mod tests {
         database.apply_migrations().unwrap();
         database.apply_migrations().unwrap();
 
-        assert_eq!(database.count_migrations().unwrap(), 2);
+        assert_eq!(database.count_migrations().unwrap(), 3);
     }
 
     #[test]
@@ -451,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn transcript_history_can_be_listed_with_latest_first_paging() {
+    fn transcript_history_listing_excludes_failed_records_from_results_and_total() {
         let path = test_db_path("history-page");
         let database = Database::open(&path).unwrap();
 
@@ -515,13 +535,40 @@ mod tests {
 
         let page = database.get_transcript_history(2, 1).unwrap();
 
-        assert_eq!(page.total, 3);
+        assert_eq!(page.total, 2);
         assert_eq!(page.limit, 2);
         assert_eq!(page.offset, 1);
-        assert_eq!(page.items.len(), 2);
-        assert_eq!(page.items[0].raw_text, "middle");
-        assert_eq!(page.items[0].error_code.as_deref(), Some("ASR_EMPTY"));
-        assert_eq!(page.items[1].raw_text, "oldest");
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].raw_text, "oldest");
+    }
+
+    #[test]
+    fn reapplying_failed_history_cleanup_migration_removes_legacy_failed_rows() {
+        let path = test_db_path("cleanup-failed-history-migration");
+        let database = Database::open(&path).unwrap();
+
+        database
+            .insert_transcript_history(NewTranscriptHistory {
+                raw_text: "failed",
+                final_text: "",
+                output_style: "raw",
+                recognition_started_at: "1700000000",
+                recognition_duration_ms: 150,
+                injected: false,
+                error_code: Some("ASR_EMPTY"),
+                error_summary: Some("No speech text was recognized."),
+            })
+            .unwrap();
+
+        let connection = database.connection.lock().unwrap();
+        connection
+            .execute("DELETE FROM migration_history WHERE id = 3", [])
+            .unwrap();
+        drop(connection);
+
+        database.apply_migrations().unwrap();
+
+        assert_eq!(database.count_transcript_history().unwrap(), 0);
     }
 
     #[test]
