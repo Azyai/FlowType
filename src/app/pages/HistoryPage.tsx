@@ -297,16 +297,18 @@ export function HistoryPage({
         </div>
       )}
 
-      {actionsDisabled && displayItems.length === 0 ? (
-        <p className="muted">{t('history.loading')}</p>
-      ) : displayItems.length === 0 ? (
-        <div className="history-empty">
-          <strong>{isSearching ? t('history.searchEmptyTitle') : t('history.emptyTitle')}</strong>
-          <p className="muted">{isSearching ? t('history.searchEmptyBody') : t('history.emptyBody')}</p>
-        </div>
-      ) : (
-        <div className="history-list-shell">
-          <div className="history-list-scroll">
+      <div className="history-list-shell">
+        <div className="history-list-scroll">
+          {actionsDisabled && displayItems.length === 0 ? (
+            <div className="history-state-shell">
+              <p className="muted">{t('history.loading')}</p>
+            </div>
+          ) : displayItems.length === 0 ? (
+            <div className="history-empty">
+              <strong>{isSearching ? t('history.searchEmptyTitle') : t('history.emptyTitle')}</strong>
+              <p className="muted">{isSearching ? t('history.searchEmptyBody') : t('history.emptyBody')}</p>
+            </div>
+          ) : (
             <div className="history-list">
               {displayItems.map((item) => {
                 const itemText = historyItemText(item);
@@ -368,8 +370,10 @@ export function HistoryPage({
                 );
               })}
             </div>
-          </div>
+          )}
+        </div>
 
+        {displayItems.length > 0 && (
           <div className="history-pagination">
             <span className="history-page-summary">
               {t('history.pageLabel', { current: resolvedCurrentPage, total: totalPages })}
@@ -444,8 +448,8 @@ export function HistoryPage({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }

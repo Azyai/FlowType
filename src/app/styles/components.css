@@ -214,9 +214,16 @@
 }
 
 .history-list-scroll {
-  max-height: 328px;
+  height: 328px;
   overflow-y: auto;
   padding-right: 6px;
+}
+
+.history-state-shell,
+.history-empty {
+  display: grid;
+  align-content: center;
+  min-height: 100%;
 }
 
 .history-empty {
