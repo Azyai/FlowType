@@ -256,6 +256,29 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('History item deleted');
   });
 
+  test('supports fuzzy search in history actions row', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Hotkey' });
+    await user.click(screen.getByRole('button', { name: 'History' }));
+
+    const searchInput = screen.getByLabelText('Search history');
+    await user.type(searchInput, '21');
+
+    await waitFor(() => {
+      expect(bridge.getHistory).toHaveBeenCalledWith(25, 0);
+    });
+
+    expect(await screen.findByText(/history item 21 transcript/i)).toBeInTheDocument();
+    expect(screen.queryByText(/history item 01 transcript/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Copy' })).toHaveLength(1);
+
+    await user.clear(searchInput);
+    expect(await screen.findByText(/history item 01 transcript/i)).toBeInTheDocument();
+  });
+
   test('toggles autostart through the native bridge', async () => {
     const user = userEvent.setup();
     render(<App />);

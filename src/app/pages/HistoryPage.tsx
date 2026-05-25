@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Copy, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Copy, Search, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { readableError } from '../../lib/formatters/errors';
 import { useI18n } from '../../lib/i18n/I18nContext';
@@ -39,6 +39,10 @@ export function HistoryPage({
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpPageValue, setJumpPageValue] = useState('1');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<TranscriptHistoryItem[] | null>(null);
+  const [searchSource, setSearchSource] = useState<TranscriptHistoryItem[] | null>(null);
 
   const loadHistory = useCallback(async (pageNumber = 1) => {
     setLoading(true);
@@ -57,6 +61,7 @@ export function HistoryPage({
       }
 
       setHistoryPage(page);
+      setSearchSource(null);
       setCurrentPage(resolvedPage);
       setJumpPageValue(String(resolvedPage));
     } catch (loadError) {
@@ -150,21 +155,108 @@ export function HistoryPage({
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(historyPage.total / PAGE_SIZE));
-  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase();
+  const isSearching = normalizedSearchTerm.length > 0;
+  const displayTotal = isSearching ? searchResults?.length ?? 0 : historyPage.total;
+  const totalPages = Math.max(1, Math.ceil(displayTotal / PAGE_SIZE));
+  const resolvedCurrentPage = Math.min(currentPage, totalPages);
+  const displayItems = useMemo(() => {
+    if (!isSearching) {
+      return historyPage.items;
+    }
+
+    const source = searchResults ?? [];
+    const offset = (resolvedCurrentPage - 1) * PAGE_SIZE;
+    return source.slice(offset, offset + PAGE_SIZE);
+  }, [historyPage.items, isSearching, resolvedCurrentPage, searchResults]);
+  const paginationItems = buildPaginationItems(resolvedCurrentPage, totalPages);
   const parsedJumpPage = Number.parseInt(jumpPageValue, 10);
   const canJumpToPage =
     Number.isInteger(parsedJumpPage) &&
     parsedJumpPage >= 1 &&
     parsedJumpPage <= totalPages &&
-    parsedJumpPage !== currentPage;
+    parsedJumpPage !== resolvedCurrentPage;
+  const actionsDisabled = loading || clearing || searchLoading;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function runSearch() {
+      if (!isSearching) {
+        setSearchLoading(false);
+        setSearchResults(null);
+        return;
+      }
+
+      setSearchLoading(true);
+      setError(null);
+
+      try {
+        let source = searchSource;
+        if (!source) {
+          const page = await getHistory(Math.max(historyPage.total, PAGE_SIZE), 0);
+          if (cancelled) {
+            return;
+          }
+          source = page.items;
+          setSearchSource(source);
+        }
+
+        const filtered = source.filter((item) => matchesHistorySearch(item, normalizedSearchTerm));
+        if (cancelled) {
+          return;
+        }
+
+        setSearchResults(filtered);
+      } catch (searchError) {
+        if (cancelled) {
+          return;
+        }
+        setError(readableError(searchError));
+        setSearchResults([]);
+      } finally {
+        if (!cancelled) {
+          setSearchLoading(false);
+        }
+      }
+    }
+
+    void runSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [historyPage.total, isSearching, normalizedSearchTerm, searchSource]);
+
+  useEffect(() => {
+    if (currentPage !== resolvedCurrentPage) {
+      setCurrentPage(resolvedCurrentPage);
+      setJumpPageValue(String(resolvedCurrentPage));
+    }
+  }, [currentPage, resolvedCurrentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setJumpPageValue('1');
+  }, [normalizedSearchTerm]);
+
+  function handlePageChange(pageNumber: number) {
+    const nextPage = Math.min(Math.max(1, pageNumber), totalPages);
+    if (isSearching) {
+      setCurrentPage(nextPage);
+      setJumpPageValue(String(nextPage));
+      return;
+    }
+
+    void loadHistory(nextPage);
+  }
 
   function handleJumpToPage() {
     if (!canJumpToPage) {
       return;
     }
 
-    void loadHistory(parsedJumpPage);
+    handlePageChange(parsedJumpPage);
   }
 
   return (
@@ -173,8 +265,8 @@ export function HistoryPage({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => void loadHistory(currentPage)}
-          disabled={loading || clearing}
+          onClick={() => void loadHistory(resolvedCurrentPage)}
+          disabled={actionsDisabled}
         >
           {t('history.refresh')}
         </button>
@@ -182,10 +274,21 @@ export function HistoryPage({
           type="button"
           className="secondary-button"
           onClick={() => void handleClearHistory()}
-          disabled={loading || clearing || historyPage.total === 0}
+          disabled={actionsDisabled || historyPage.total === 0}
         >
           {t('advanced.clearHistory')}
         </button>
+        <label className="history-search-field">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder={t('history.searchPlaceholder')}
+            aria-label={t('history.search')}
+            disabled={loading || clearing}
+          />
+        </label>
       </div>
 
       {error && (
@@ -194,18 +297,18 @@ export function HistoryPage({
         </div>
       )}
 
-      {loading && historyPage.items.length === 0 ? (
+      {actionsDisabled && displayItems.length === 0 ? (
         <p className="muted">{t('history.loading')}</p>
-      ) : historyPage.items.length === 0 ? (
+      ) : displayItems.length === 0 ? (
         <div className="history-empty">
-          <strong>{t('history.emptyTitle')}</strong>
-          <p className="muted">{t('history.emptyBody')}</p>
+          <strong>{isSearching ? t('history.searchEmptyTitle') : t('history.emptyTitle')}</strong>
+          <p className="muted">{isSearching ? t('history.searchEmptyBody') : t('history.emptyBody')}</p>
         </div>
       ) : (
         <div className="history-list-shell">
           <div className="history-list-scroll">
             <div className="history-list">
-              {historyPage.items.map((item) => {
+              {displayItems.map((item) => {
                 const itemText = historyItemText(item);
                 const previewText = truncateHistoryText(itemText);
                 const isFailed = Boolean(item.error_code);
@@ -238,7 +341,7 @@ export function HistoryPage({
                           type="button"
                           className="secondary-button history-action-button"
                           onClick={() => void handleCopyHistoryItem(item)}
-                          disabled={loading || clearing || deletingId === item.id}
+                          disabled={actionsDisabled || deletingId === item.id}
                         >
                           <Copy aria-hidden="true" />
                           {t('history.copy')}
@@ -247,7 +350,7 @@ export function HistoryPage({
                           type="button"
                           className="secondary-button history-action-button danger"
                           onClick={() => void handleDeleteHistoryItem(item.id)}
-                          disabled={loading || clearing || deletingId === item.id}
+                          disabled={actionsDisabled || deletingId === item.id}
                         >
                           <Trash2 aria-hidden="true" />
                           {t('history.delete')}
@@ -269,15 +372,15 @@ export function HistoryPage({
 
           <div className="history-pagination">
             <span className="history-page-summary">
-              {t('history.pageLabel', { current: currentPage, total: totalPages })}
+              {t('history.pageLabel', { current: resolvedCurrentPage, total: totalPages })}
             </span>
 
             <div className="history-page-buttons">
               <button
                 type="button"
                 className="secondary-button history-page-button"
-                onClick={() => void loadHistory(currentPage - 1)}
-                disabled={loading || clearing || currentPage === 1}
+                onClick={() => handlePageChange(resolvedCurrentPage - 1)}
+                disabled={actionsDisabled || resolvedCurrentPage === 1}
               >
                 <ChevronLeft aria-hidden="true" />
                 {t('history.previousPage')}
@@ -292,10 +395,10 @@ export function HistoryPage({
                   <button
                     key={item}
                     type="button"
-                    className={`secondary-button history-page-button${item === currentPage ? ' active' : ''}`}
-                    onClick={() => void loadHistory(item)}
-                    disabled={loading || clearing || item === currentPage}
-                    aria-current={item === currentPage ? 'page' : undefined}
+                    className={`secondary-button history-page-button${item === resolvedCurrentPage ? ' active' : ''}`}
+                    onClick={() => handlePageChange(item)}
+                    disabled={actionsDisabled || item === resolvedCurrentPage}
+                    aria-current={item === resolvedCurrentPage ? 'page' : undefined}
                   >
                     {item}
                   </button>
@@ -305,8 +408,8 @@ export function HistoryPage({
               <button
                 type="button"
                 className="secondary-button history-page-button"
-                onClick={() => void loadHistory(currentPage + 1)}
-                disabled={loading || clearing || currentPage === totalPages}
+                onClick={() => handlePageChange(resolvedCurrentPage + 1)}
+                disabled={actionsDisabled || resolvedCurrentPage === totalPages}
               >
                 {t('history.nextPage')}
                 <ChevronRight aria-hidden="true" />
@@ -329,13 +432,13 @@ export function HistoryPage({
                     handleJumpToPage();
                   }
                 }}
-                disabled={loading || clearing}
+                disabled={actionsDisabled}
               />
               <button
                 type="button"
                 className="secondary-button history-jump-button"
                 onClick={handleJumpToPage}
-                disabled={loading || clearing || !canJumpToPage}
+                disabled={actionsDisabled || !canJumpToPage}
               >
                 {t('history.goToPage')}
               </button>
@@ -364,6 +467,19 @@ function historyItemChipLabel(
   }
 
   return t(`output.${item.output_style}`);
+}
+
+function matchesHistorySearch(item: TranscriptHistoryItem, query: string) {
+  const haystack = [
+    item.final_text,
+    item.raw_text,
+    item.error_summary ?? '',
+    item.error_code ?? ''
+  ]
+    .join(' ')
+    .toLocaleLowerCase();
+
+  return haystack.includes(query);
 }
 
 function buildPaginationItems(currentPage: number, totalPages: number) {

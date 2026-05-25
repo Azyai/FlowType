@@ -158,7 +158,48 @@
 .history-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
+}
+
+.history-search-field {
+  display: flex;
+  flex: 1 1 260px;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  min-width: 220px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid #dde2eb;
+  border-radius: 8px;
+  color: #6b7280;
+  background: #ffffff;
+}
+
+.history-search-field:focus-within {
+  border-color: #ff5a4f;
+  box-shadow: 0 0 0 3px rgba(255, 90, 79, 0.14);
+}
+
+.history-search-field svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.history-search-field input {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.history-search-field input:hover,
+.history-search-field input:focus {
+  border: 0;
+  box-shadow: none;
 }
 
 .history-empty,
