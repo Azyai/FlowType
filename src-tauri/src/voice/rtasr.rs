@@ -532,8 +532,7 @@ struct RtasrFrame {
 
 #[derive(Debug, Default)]
 struct ResultAccumulator {
-    finalized_segments: BTreeMap<i64, String>,
-    live_segment: Option<(i64, String)>,
+    segments: BTreeMap<i64, String>,
 }
 
 impl ResultAccumulator {
@@ -543,39 +542,14 @@ impl ResultAccumulator {
             return self.combined_text();
         }
 
-        match payload.result_type() {
-            RtasrResultType::Partial => {
-                self.live_segment = Some((payload.seg_id, text));
-            }
-            RtasrResultType::Final => {
-                self.finalized_segments.insert(payload.seg_id, text);
-                if self
-                    .live_segment
-                    .as_ref()
-                    .is_some_and(|(seg_id, _)| *seg_id == payload.seg_id)
-                {
-                    self.live_segment = None;
-                }
-            }
-        }
+        // RTASR streams incremental updates keyed by seg_id. Keep the latest text
+        // for each segment so later updates replace earlier revisions in place.
+        self.segments.insert(payload.seg_id, text);
         self.combined_text()
     }
 
     fn combined_text(&self) -> String {
-        let mut ordered = self
-            .finalized_segments
-            .iter()
-            .map(|(seg_id, text)| (*seg_id, text.clone()))
-            .collect::<Vec<_>>();
-
-        if let Some((seg_id, text)) = &self.live_segment {
-            if !self.finalized_segments.contains_key(seg_id) {
-                ordered.push((*seg_id, text.clone()));
-            }
-        }
-
-        ordered.sort_by_key(|(seg_id, _)| *seg_id);
-        stitch_segments(ordered.into_iter().map(|(_, text)| text))
+        self.segments.values().cloned().collect()
     }
 }
 
@@ -594,14 +568,6 @@ impl RtasrResultPayload {
             .map(RtasrSentence::text)
             .unwrap_or_default()
     }
-
-    fn result_type(&self) -> RtasrResultType {
-        self.cn
-            .as_ref()
-            .and_then(|cn| cn.st.as_ref())
-            .map(RtasrSentence::result_type)
-            .unwrap_or(RtasrResultType::Partial)
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -611,8 +577,6 @@ struct RtasrCnPayload {
 
 #[derive(Debug, Deserialize)]
 struct RtasrSentence {
-    #[serde(default = "default_partial_type")]
-    r#type: String,
     #[serde(default)]
     rt: Vec<RtasrResultTrack>,
 }
@@ -626,23 +590,6 @@ impl RtasrSentence {
             .map(|candidate| candidate.w.as_str())
             .collect::<String>()
     }
-
-    fn result_type(&self) -> RtasrResultType {
-        match self.r#type.as_str() {
-            "0" => RtasrResultType::Final,
-            _ => RtasrResultType::Partial,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RtasrResultType {
-    Partial,
-    Final,
-}
-
-fn default_partial_type() -> String {
-    "1".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -681,36 +628,6 @@ fn resample_chunk_to_16khz_bytes(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     pcm.into_iter()
         .flat_map(|sample| sample.to_le_bytes())
         .collect()
-}
-
-fn stitch_segments(segments: impl IntoIterator<Item = String>) -> String {
-    let mut combined = String::new();
-
-    for segment in segments {
-        append_with_overlap(&mut combined, segment.trim());
-    }
-
-    combined
-}
-
-fn append_with_overlap(target: &mut String, next: &str) {
-    if next.is_empty() {
-        return;
-    }
-    if target.is_empty() {
-        target.push_str(next);
-        return;
-    }
-
-    let target_chars = target.chars().collect::<Vec<_>>();
-    let next_chars = next.chars().collect::<Vec<_>>();
-    let max_overlap = target_chars.len().min(next_chars.len());
-    let overlap = (2..=max_overlap)
-        .rev()
-        .find(|count| target_chars[target_chars.len() - count..] == next_chars[..*count])
-        .unwrap_or(0);
-
-    target.extend(next_chars.into_iter().skip(overlap));
 }
 
 fn map_transport_error_to_asr(error: tungstenite::Error) -> AppError {
@@ -802,7 +719,7 @@ mod tests {
     }
 
     #[test]
-    fn overlapping_segments_are_stitched_without_repeating_prefix() {
+    fn sequential_segments_are_appended_in_seg_id_order() {
         let mut accumulator = ResultAccumulator::default();
         accumulator.apply(RtasrResultPayload {
             seg_id: 5,
@@ -814,7 +731,27 @@ mod tests {
             cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"什么原因啊兄弟们"}]}]}]}}"#).ok(),
         });
 
-        assert_eq!(text, "为什么什么原因啊兄弟们");
+        assert_eq!(text, "为什么什么什么原因啊兄弟们");
+    }
+
+    #[test]
+    fn later_updates_with_same_segment_id_replace_previous_revision() {
+        let mut accumulator = ResultAccumulator::default();
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 5,
+            cn: serde_json::from_str(r#"{"st":{"type":"0","rt":[{"ws":[{"cw":[{"w":"第一句"}]}]}]}}"#).ok(),
+        });
+        accumulator.apply(RtasrResultPayload {
+            seg_id: 6,
+            cn: serde_json::from_str(r#"{"st":{"type":"1","rt":[{"ws":[{"cw":[{"w":"第二"}]}]}]}}"#).ok(),
+        });
+
+        let text = accumulator.apply(RtasrResultPayload {
+            seg_id: 6,
+            cn: serde_json::from_str(r#"{"st":{"type":"0","rt":[{"ws":[{"cw":[{"w":"第二句话"}]}]}]}}"#).ok(),
+        });
+
+        assert_eq!(text, "第一句第二句话");
     }
 
     #[test]

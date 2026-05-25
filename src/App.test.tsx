@@ -12,7 +12,7 @@ const settings: AppSettings = {
   toggle_hotkey: 'Ctrl+Alt+M',
   rtasr_app_id: '',
   rtasr_api_key: '',
-  rtasr_language: 'zh_cn',
+  rtasr_language: 'zh_en',
   rtasr_timeout_ms: 10000,
   output_style: 'raw',
   clipboard_restore: 'never',
@@ -65,7 +65,7 @@ describe('FlowType settings shell', () => {
     vi.spyOn(bridge, 'getSettings').mockResolvedValue(settings);
     vi.spyOn(bridge, 'saveSettings').mockResolvedValue(settings);
     vi.spyOn(bridge, 'getAppStatus').mockResolvedValue({
-      app_version: '0.1.0',
+      app_version: '0.1.1',
       paused: false,
       current_mode: 'raw',
       tray_available: true
@@ -78,8 +78,8 @@ describe('FlowType settings shell', () => {
     });
     vi.spyOn(bridge, 'checkUpdate').mockResolvedValue({
       status: 'available',
-      current_version: '0.1.0',
-      latest_version: '0.1.1',
+      current_version: '0.1.1',
+      latest_version: '0.1.2',
       channel: 'stable',
       notes: 'Mock release',
       manifest_url: 'mock://updates/stable.json'
@@ -94,7 +94,7 @@ describe('FlowType settings shell', () => {
     });
     vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
     vi.spyOn(bridge, 'deleteHistoryItem').mockResolvedValue({ deleted_count: 1 });
-    vi.spyOn(bridge, 'getHistory').mockImplementation(async (limit, offset) => ({
+    vi.spyOn(bridge, 'getHistory').mockImplementation(async (limit = 20, offset = 0) => ({
       items: historyItems.slice(offset, offset + limit),
       total: historyItems.length,
       limit,
@@ -119,7 +119,7 @@ describe('FlowType settings shell', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Hotkey' })).toBeInTheDocument();
-    expect(screen.getByText('Version 0.1.0')).toBeInTheDocument();
+    expect(screen.getByText('Version 0.1.1')).toBeInTheDocument();
     expect(screen.getByLabelText('Hold-to-talk hotkey')).toBeInTheDocument();
     expect(screen.getByLabelText('Toggle recording hotkey')).toBeInTheDocument();
   });
@@ -174,7 +174,7 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     await user.click(screen.getByRole('button', { name: 'Check update' }));
 
-    expect(await screen.findByText('New version 0.1.1 available')).toBeInTheDocument();
+    expect(await screen.findByText('New version 0.1.2 available')).toBeInTheDocument();
   });
 
   test('advanced settings include output mode and history controls', async () => {
