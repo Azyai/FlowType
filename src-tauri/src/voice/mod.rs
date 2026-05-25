@@ -412,7 +412,7 @@ fn record_history_if_enabled(
     error_code: Option<&str>,
     error_summary: Option<&str>,
 ) {
-    if !settings.save_history {
+    if !settings.save_history || !should_record_history_entry(error_code, error_summary) {
         return;
     }
 
@@ -428,6 +428,10 @@ fn record_history_if_enabled(
     }) {
         log::warn!("failed to record transcript history: {error}");
     }
+}
+
+fn should_record_history_entry(error_code: Option<&str>, error_summary: Option<&str>) -> bool {
+    error_code.is_none() && error_summary.map(str::trim).unwrap_or_default().is_empty()
 }
 
 fn output_style_label(output_style: &OutputStyle) -> &'static str {
@@ -498,5 +502,13 @@ mod tests {
         tracker.observe(0.2);
         assert!(tracker.speech_detected());
         assert!(tracker.silence_elapsed().is_some());
+    }
+
+    #[test]
+    fn history_recording_skips_failed_results() {
+        assert!(should_record_history_entry(None, None));
+        assert!(should_record_history_entry(None, Some("   ")));
+        assert!(!should_record_history_entry(Some("ASR_EMPTY"), None));
+        assert!(!should_record_history_entry(None, Some("No speech text was recognized.")));
     }
 }

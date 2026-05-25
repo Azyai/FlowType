@@ -44,3 +44,10 @@ debug-assertions = true
 
 [profile.release.build-override]
 debug-assertions = true
+
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+incremental = false
