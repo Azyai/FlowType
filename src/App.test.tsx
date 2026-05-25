@@ -30,7 +30,8 @@ const settings: AppSettings = {
   update_channel: 'stable',
   update_manifest_url: 'mock://updates/stable.json',
   auto_check_update: false,
-  locale_preference: 'auto'
+  locale_preference: 'auto',
+  formal_scene: 'general'
 };
 
 const historyItems = Array.from({ length: 25 }, (_, index) => ({

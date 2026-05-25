@@ -2,6 +2,7 @@ export type InputMode = 'hold_to_talk' | 'toggle';
 export type RtasrLanguage = 'zh_cn' | 'en_us' | 'zh_en';
 export type HistoryRetentionDays = 7 | 14 | 30;
 export type OutputStyle = 'raw' | 'clean' | 'formal';
+export type FormalScene = 'general' | 'email' | 'greeting' | 'professional_reply';
 export type ClipboardRestore = 'always' | 'delayed' | 'never' | 'text_only';
 export type FloatingWindowPosition = 'bottom_right' | 'cursor_nearby';
 export type UpdateChannel = 'stable' | 'beta' | 'dev';
@@ -35,6 +36,7 @@ export interface AppSettings {
   update_manifest_url: string;
   auto_check_update: boolean;
   locale_preference: LocalePreference;
+  formal_scene: FormalScene;
 }
 
 export interface AppStatus {

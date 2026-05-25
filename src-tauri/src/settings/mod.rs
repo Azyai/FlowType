@@ -51,6 +51,15 @@ pub enum OutputStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum FormalScene {
+    General,
+    Email,
+    Greeting,
+    ProfessionalReply,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ClipboardRestore {
     Always,
     Delayed,
@@ -85,6 +94,10 @@ pub enum LocalePreference {
 
 fn default_locale_preference() -> LocalePreference {
     LocalePreference::Auto
+}
+
+fn default_formal_scene() -> FormalScene {
+    FormalScene::General
 }
 
 fn default_history_retention_days() -> u16 {
@@ -145,6 +158,8 @@ pub struct AppSettings {
     pub auto_check_update: bool,
     #[serde(default = "default_locale_preference")]
     pub locale_preference: LocalePreference,
+    #[serde(default = "default_formal_scene")]
+    pub formal_scene: FormalScene,
 }
 
 impl AppSettings {
@@ -181,6 +196,7 @@ impl Default for AppSettings {
             update_manifest_url: "mock://updates/stable.json".to_string(),
             auto_check_update: false,
             locale_preference: LocalePreference::Auto,
+            formal_scene: FormalScene::General,
         }
     }
 }
@@ -331,6 +347,7 @@ mod tests {
         assert_eq!(settings.update_manifest_url, "mock://updates/stable.json");
         assert!(!settings.auto_check_update);
         assert_eq!(settings.locale_preference, LocalePreference::Auto);
+        assert_eq!(settings.formal_scene, FormalScene::General);
     }
 
     #[test]
@@ -371,6 +388,7 @@ mod tests {
         assert_eq!(loaded.history_retention_days, 14);
         assert_eq!(loaded.min_recording_ms, 500);
         assert_eq!(loaded.max_recording_ms, 60_000);
+        assert_eq!(loaded.formal_scene, FormalScene::General);
     }
 
     #[test]
@@ -393,6 +411,7 @@ mod tests {
         settings.toggle_hotkey = "Ctrl+Alt+M".to_string();
         settings.auto_start = true;
         settings.update_channel = UpdateChannel::Beta;
+        settings.formal_scene = FormalScene::Email;
 
         store.save(&settings).unwrap();
         let loaded = store.load().unwrap();
