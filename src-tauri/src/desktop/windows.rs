@@ -30,6 +30,7 @@ pub fn spawn_mascot_window(app: &AppHandle) -> AppResult<()> {
 
     let window = WebviewWindowBuilder::new(app, "mascot", WebviewUrl::App("/?window=mascot".into()))
         .title("FlowType Mascot")
+        .devtools(false)
         .inner_size(MASCOT_WINDOW_SIZE, MASCOT_WINDOW_SIZE)
         .resizable(false)
         .transparent(true)
@@ -70,6 +71,7 @@ pub fn spawn_live_caption_window(app: &AppHandle) -> AppResult<()> {
         WebviewUrl::App("/?window=live-caption".into()),
     )
     .title("FlowType Live Caption")
+    .devtools(false)
     .inner_size(LIVE_CAPTION_WINDOW_WIDTH, LIVE_CAPTION_WINDOW_HEIGHT)
     .resizable(false)
     .transparent(true)
@@ -97,6 +99,7 @@ pub fn show_about_window(app: &AppHandle) -> AppResult<()> {
 
     WebviewWindowBuilder::new(app, "about", WebviewUrl::App("index.html".into()))
         .title("About FlowType")
+        .devtools(false)
         .inner_size(520.0, 460.0)
         .resizable(false)
         .center()
