@@ -1,4 +1,4 @@
-import { Copy, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { readableError } from '../../lib/formatters/errors';
@@ -10,7 +10,7 @@ import type {
   TranscriptHistoryPage as TranscriptHistoryPageResult
 } from '../../types';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const HISTORY_PREVIEW_LENGTH = 30;
 
 export function HistoryPage({
@@ -37,21 +37,28 @@ export function HistoryPage({
   const [clearing, setClearing] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [jumpPageValue, setJumpPageValue] = useState('1');
 
-  const loadHistory = useCallback(async (offset = 0, append = false) => {
+  const loadHistory = useCallback(async (pageNumber = 1) => {
     setLoading(true);
     setError(null);
 
     try {
-      const page = await getHistory(PAGE_SIZE, offset);
-      setHistoryPage((current) =>
-        append
-          ? {
-              ...page,
-              items: [...current.items, ...page.items]
-            }
-          : page
-      );
+      const requestedPage = Math.max(1, pageNumber);
+      const initialOffset = (requestedPage - 1) * PAGE_SIZE;
+      let page = await getHistory(PAGE_SIZE, initialOffset);
+      const resolvedTotalPages = Math.max(1, Math.ceil(page.total / PAGE_SIZE));
+      const resolvedPage = page.total === 0 ? 1 : Math.min(requestedPage, resolvedTotalPages);
+
+      if (resolvedPage !== requestedPage) {
+        const resolvedOffset = (resolvedPage - 1) * PAGE_SIZE;
+        page = await getHistory(PAGE_SIZE, resolvedOffset);
+      }
+
+      setHistoryPage(page);
+      setCurrentPage(resolvedPage);
+      setJumpPageValue(String(resolvedPage));
     } catch (loadError) {
       setError(readableError(loadError));
     } finally {
@@ -85,7 +92,7 @@ export function HistoryPage({
     try {
       const result = await onClearHistory();
       if (result) {
-        await loadHistory();
+        await loadHistory(1);
       }
     } finally {
       setClearing(false);
@@ -131,11 +138,9 @@ export function HistoryPage({
     try {
       const result = await deleteHistoryItem(id);
       if (result.deleted_count > 0) {
-        const nextOffset =
-          historyPage.offset > 0 && historyPage.items.length === result.deleted_count
-            ? Math.max(0, historyPage.offset - PAGE_SIZE)
-            : historyPage.offset;
-        await loadHistory(nextOffset);
+        const remainingTotal = Math.max(0, historyPage.total - result.deleted_count);
+        const nextPage = remainingTotal === 0 ? 1 : Math.min(currentPage, Math.ceil(remainingTotal / PAGE_SIZE));
+        await loadHistory(nextPage);
         onToast('success', t('notice.historyItemDeleted'));
       }
     } catch (deleteError) {
@@ -145,7 +150,22 @@ export function HistoryPage({
     }
   }
 
-  const canLoadMore = historyPage.items.length < historyPage.total;
+  const totalPages = Math.max(1, Math.ceil(historyPage.total / PAGE_SIZE));
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const parsedJumpPage = Number.parseInt(jumpPageValue, 10);
+  const canJumpToPage =
+    Number.isInteger(parsedJumpPage) &&
+    parsedJumpPage >= 1 &&
+    parsedJumpPage <= totalPages &&
+    parsedJumpPage !== currentPage;
+
+  function handleJumpToPage() {
+    if (!canJumpToPage) {
+      return;
+    }
+
+    void loadHistory(parsedJumpPage);
+  }
 
   return (
     <section className="panel history-panel">
@@ -153,7 +173,7 @@ export function HistoryPage({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => void loadHistory()}
+          onClick={() => void loadHistory(currentPage)}
           disabled={loading || clearing}
         >
           {t('history.refresh')}
@@ -182,78 +202,148 @@ export function HistoryPage({
           <p className="muted">{t('history.emptyBody')}</p>
         </div>
       ) : (
-        <div className="history-list">
-          {historyPage.items.map((item) => {
-            const itemText = historyItemText(item);
-            const previewText = truncateHistoryText(itemText);
-            const isFailed = Boolean(item.error_code);
-            const chipLabel = historyItemChipLabel(item, t);
-            const deliveryLabel = isFailed
-              ? t('history.failed')
-              : item.injected
-                ? t('history.injected')
-                : t('history.copied');
+        <div className="history-list-shell">
+          <div className="history-list-scroll">
+            <div className="history-list">
+              {historyPage.items.map((item) => {
+                const itemText = historyItemText(item);
+                const previewText = truncateHistoryText(itemText);
+                const isFailed = Boolean(item.error_code);
+                const chipLabel = historyItemChipLabel(item, t);
+                const deliveryLabel = isFailed
+                  ? t('history.failed')
+                  : item.injected
+                    ? t('history.injected')
+                    : t('history.copied');
 
-            return (
-              <article key={item.id} className="history-item">
-                <div className="history-item-header">
-                  <div className="history-item-meta">
-                    <strong>{deliveryLabel}</strong>
-                    <span>{t('history.createdAt')}: {formatDate(item.created_at)}</span>
-                    <span>{t('history.duration')}: {formatDuration(item.recognition_duration_ms)}</span>
-                  </div>
-                  {chipLabel && (
-                    <span className={`history-chip${isFailed ? ' danger' : ''}`}>
-                      {chipLabel}
+                return (
+                  <article key={item.id} className="history-item">
+                    <div className="history-item-header">
+                      <div className="history-item-meta">
+                        <strong>{deliveryLabel}</strong>
+                        <span>{t('history.createdAt')}: {formatDate(item.created_at)}</span>
+                        <span>{t('history.duration')}: {formatDuration(item.recognition_duration_ms)}</span>
+                      </div>
+                      {chipLabel && (
+                        <span className={`history-chip${isFailed ? ' danger' : ''}`}>
+                          {chipLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="history-item-body compact">
+                      <p className="history-preview">{previewText}</p>
+                      <div className="history-item-actions">
+                        <button
+                          type="button"
+                          className="secondary-button history-action-button"
+                          onClick={() => void handleCopyHistoryItem(item)}
+                          disabled={loading || clearing || deletingId === item.id}
+                        >
+                          <Copy aria-hidden="true" />
+                          {t('history.copy')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button history-action-button danger"
+                          onClick={() => void handleDeleteHistoryItem(item.id)}
+                          disabled={loading || clearing || deletingId === item.id}
+                        >
+                          <Trash2 aria-hidden="true" />
+                          {t('history.delete')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {item.error_summary && (
+                      <div className="inline-result danger">
+                        {item.error_code ? `${item.error_code}: ` : ''}
+                        {item.error_summary}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="history-pagination">
+            <div className="history-page-controls">
+              <span className="history-page-summary">
+                {t('history.pageLabel', { current: currentPage, total: totalPages })}
+              </span>
+
+              <div className="history-page-buttons">
+                <button
+                  type="button"
+                  className="secondary-button history-page-button"
+                  onClick={() => void loadHistory(currentPage - 1)}
+                  disabled={loading || clearing || currentPage === 1}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                  {t('history.previousPage')}
+                </button>
+
+                {paginationItems.map((item, index) =>
+                  item === 'ellipsis' ? (
+                    <span key={`ellipsis-${index}`} className="history-page-ellipsis" aria-hidden="true">
+                      ...
                     </span>
-                  )}
-                </div>
-
-                <div className="history-item-body compact">
-                  <p className="history-preview">{previewText}</p>
-                  <div className="history-item-actions">
+                  ) : (
                     <button
+                      key={item}
                       type="button"
-                      className="secondary-button history-action-button"
-                      onClick={() => void handleCopyHistoryItem(item)}
-                      disabled={loading || clearing || deletingId === item.id}
+                      className={`secondary-button history-page-button${item === currentPage ? ' active' : ''}`}
+                      onClick={() => void loadHistory(item)}
+                      disabled={loading || clearing || item === currentPage}
+                      aria-current={item === currentPage ? 'page' : undefined}
                     >
-                      <Copy aria-hidden="true" />
-                      {t('history.copy')}
+                      {item}
                     </button>
-                    <button
-                      type="button"
-                      className="secondary-button history-action-button danger"
-                      onClick={() => void handleDeleteHistoryItem(item.id)}
-                      disabled={loading || clearing || deletingId === item.id}
-                    >
-                      <Trash2 aria-hidden="true" />
-                      {t('history.delete')}
-                    </button>
-                  </div>
-                </div>
-
-                {item.error_summary && (
-                  <div className="inline-result danger">
-                    {item.error_code ? `${item.error_code}: ` : ''}
-                    {item.error_summary}
-                  </div>
+                  )
                 )}
-              </article>
-            );
-          })}
-        </div>
-      )}
 
-      {canLoadMore && (
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void loadHistory(historyPage.items.length, true)}
-          disabled={loading || clearing}
-        >
-          {t('history.loadMore')}
-        </button>
+                <button
+                  type="button"
+                  className="secondary-button history-page-button"
+                  onClick={() => void loadHistory(currentPage + 1)}
+                  disabled={loading || clearing || currentPage === totalPages}
+                >
+                  {t('history.nextPage')}
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <div className="history-page-jump">
+              <label htmlFor="history-page-jump-input">{t('history.jumpToPage')}</label>
+              <input
+                id="history-page-jump-input"
+                type="number"
+                min={1}
+                max={totalPages}
+                inputMode="numeric"
+                value={jumpPageValue}
+                onChange={(event) => setJumpPageValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleJumpToPage();
+                  }
+                }}
+                disabled={loading || clearing}
+              />
+              <button
+                type="button"
+                className="secondary-button history-jump-button"
+                onClick={handleJumpToPage}
+                disabled={loading || clearing || !canJumpToPage}
+              >
+                {t('history.goToPage')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );
@@ -276,6 +366,32 @@ function historyItemChipLabel(
   }
 
   return t(`output.${item.output_style}`);
+}
+
+function buildPaginationItems(currentPage: number, totalPages: number) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const start = Math.max(2, Math.min(currentPage - 1, totalPages - 4));
+  const end = Math.min(totalPages - 1, Math.max(currentPage + 1, 5));
+  const items: Array<number | 'ellipsis'> = [1];
+
+  if (start > 2) {
+    items.push('ellipsis');
+  }
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < totalPages - 1) {
+    items.push('ellipsis');
+  }
+
+  items.push(totalPages);
+
+  return items;
 }
 
 function truncateHistoryText(text: string) {

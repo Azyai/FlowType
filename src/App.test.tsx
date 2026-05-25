@@ -33,6 +33,19 @@ const settings: AppSettings = {
   locale_preference: 'auto'
 };
 
+const historyItems = Array.from({ length: 25 }, (_, index) => ({
+  id: index + 1,
+  raw_text: `raw transcript ${index + 1}`,
+  final_text: `history item ${String(index + 1).padStart(2, '0')} transcript content that should be truncated`,
+  output_style: 'raw' as const,
+  recognition_started_at: 1700000000 + index,
+  recognition_duration_ms: 820 + index,
+  injected: index % 2 === 0,
+  error_code: null,
+  error_summary: null,
+  created_at: 1700000000 + index
+}));
+
 describe('FlowType settings shell', () => {
   const originalLanguage = navigator.language;
   const originalClipboard = navigator.clipboard;
@@ -81,25 +94,12 @@ describe('FlowType settings shell', () => {
     });
     vi.spyOn(bridge, 'clearHistory').mockResolvedValue({ deleted_count: 0 });
     vi.spyOn(bridge, 'deleteHistoryItem').mockResolvedValue({ deleted_count: 1 });
-    vi.spyOn(bridge, 'getHistory').mockResolvedValue({
-      items: [
-        {
-          id: 1,
-          raw_text: 'raw transcript',
-          final_text: 'this is a long final transcript that should be truncated in history view',
-          output_style: 'raw',
-          recognition_started_at: 1700000000,
-          recognition_duration_ms: 820,
-          injected: true,
-          error_code: null,
-          error_summary: null,
-          created_at: 1700000000
-        }
-      ],
-      total: 1,
-      limit: 20,
-      offset: 0
-    });
+    vi.spyOn(bridge, 'getHistory').mockImplementation(async (limit, offset) => ({
+      items: historyItems.slice(offset, offset + limit),
+      total: historyItems.length,
+      limit,
+      offset
+    }));
   });
 
   afterEach(() => {
@@ -204,60 +204,53 @@ describe('FlowType settings shell', () => {
 
   test('renders compact transcript history items and supports copy/delete actions with toast feedback', async () => {
     const user = userEvent.setup();
-    const historyText = 'this is a long final transcript that should be truncated in history view';
-    vi.mocked(bridge.getHistory)
-      .mockResolvedValueOnce({
-        items: [
-          {
-            id: 1,
-            raw_text: 'raw transcript',
-            final_text: historyText,
-            output_style: 'raw',
-            recognition_started_at: 1700000000,
-            recognition_duration_ms: 820,
-            injected: true,
-            error_code: null,
-            error_summary: null,
-            created_at: 1700000000
-          }
-        ],
-        total: 1,
-        limit: 20,
-        offset: 0
-      })
-      .mockResolvedValueOnce({
-        items: [],
-        total: 0,
-        limit: 20,
-        offset: 0
-      });
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'History' }));
 
-    expect(await screen.findByRole('button', { name: 'Copy' })).toBeInTheDocument();
-    expect(await screen.findByText('1 records')).toBeInTheDocument();
+    expect(await screen.findAllByRole('button', { name: 'Copy' })).toHaveLength(10);
+    expect(bridge.getHistory).toHaveBeenCalledWith(10, 0);
+    expect(await screen.findByText('25 records')).toBeInTheDocument();
     expect(screen.getByText('History is enabled')).toBeInTheDocument();
     expect(screen.getByText('Retention: 14 days')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(10);
     expect(screen.queryByText(/^raw$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText('raw transcript')).not.toBeInTheDocument();
-    expect(screen.getByText('this is a long final transcrip...')).toBeInTheDocument();
+    expect(screen.queryByText('raw transcript 1')).not.toBeInTheDocument();
+    expect(screen.getByText(/history item 01 transcript/i)).toBeInTheDocument();
+    expect(screen.queryByText(/history item 11 transcript/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset settings' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save settings' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    await user.click(screen.getByRole('button', { name: '2' }));
+    await waitFor(() => {
+      expect(bridge.getHistory).toHaveBeenCalledWith(10, 10);
+    });
+    expect(await screen.findByText('Page 2 of 3')).toBeInTheDocument();
+    expect(screen.getByText(/history item 11 transcript/i)).toBeInTheDocument();
+    expect(screen.queryByText(/history item 01 transcript/i)).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Jump to page'));
+    await user.type(screen.getByLabelText('Jump to page'), '3');
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+    await waitFor(() => {
+      expect(bridge.getHistory).toHaveBeenCalledWith(10, 20);
+    });
+    expect(await screen.findByText('Page 3 of 3')).toBeInTheDocument();
+    expect(screen.getByText(/history item 21 transcript/i)).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: 'Copy' })[0]);
     expect(await screen.findByRole('status')).toHaveTextContent('History item copied');
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
     expect(await screen.findByRole('dialog')).toHaveTextContent('Delete history record');
     expect(screen.getByText('Delete this history record?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => {
-      expect(bridge.deleteHistoryItem).toHaveBeenCalledWith(1);
-      expect(bridge.getHistory).toHaveBeenCalledTimes(2);
+      expect(bridge.deleteHistoryItem).toHaveBeenCalledWith(21);
+      expect(bridge.getHistory).toHaveBeenCalledTimes(4);
     });
 
     expect(await screen.findByRole('status')).toHaveTextContent('History item deleted');

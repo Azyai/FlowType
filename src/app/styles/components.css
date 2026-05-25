@@ -167,6 +167,17 @@
   gap: 14px;
 }
 
+.history-list-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.history-list-scroll {
+  max-height: 640px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
 .history-empty {
   padding: 18px;
   border: 1px dashed #dde2eb;
@@ -277,6 +288,96 @@
   background: #fff0f0;
 }
 
+.history-pagination {
+  display: grid;
+  gap: 12px;
+}
+
+.history-page-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-page-summary {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.history-page-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-page-button {
+  min-width: 44px;
+}
+
+.history-page-button.active {
+  color: #ffffff;
+  border-color: #ff5a4f;
+  background: #ff5a4f;
+}
+
+.history-page-button.active:hover {
+  background: #ff5a4f;
+}
+
+.history-page-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.history-page-ellipsis {
+  color: #7a8190;
+  font-weight: 700;
+}
+
+.history-page-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-page-jump label {
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.history-page-jump input {
+  width: 96px;
+}
+
+.history-jump-button {
+  min-width: 88px;
+}
+
+.history-list-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.history-list-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.72);
+}
+
+.history-list-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(241, 245, 249, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 90, 79, 0.44);
+}
+
+.history-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 90, 79, 0.68);
+}
+
 .toast {
   position: fixed;
   top: 54px;
@@ -342,5 +443,13 @@ nav::-webkit-scrollbar-thumb:hover {
 
   .history-item-actions {
     justify-content: flex-start;
+  }
+
+  .history-page-controls {
+    align-items: stretch;
+  }
+
+  .history-page-buttons {
+    width: 100%;
   }
 }
