@@ -157,7 +157,11 @@ export function MascotPage() {
   }
 
   return (
-    <div className="mascot-container" onContextMenu={handleContextMenu}>
+    <div
+      className="mascot-container"
+      data-allow-context-menu="true"
+      onContextMenu={handleContextMenu}
+    >
       {showVoiceRipple && isSpeaking && (
         <div
           className="mascot-ripple speaking"
