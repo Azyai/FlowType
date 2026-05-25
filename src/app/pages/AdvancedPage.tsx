@@ -1,11 +1,12 @@
 import type { AppSettings, HistoryRetentionDays, UpdateCheckResult } from '../../types';
 import { updateMessage } from '../../lib/formatters/updateMessage';
 import { useI18n } from '../../lib/i18n/I18nContext';
+import type { TranslationKey } from '../../lib/i18n/types';
 
 const formalSceneOptions: Array<{
   value: AppSettings['formal_scene'];
-  labelKey: string;
-  descriptionKey: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
 }> = [
   {
     value: 'general',
@@ -62,53 +63,44 @@ export function AdvancedPage({
         </select>
       </label>
 
-      <fieldset
-        className={`skill-fieldset${formalModeEnabled ? '' : ' is-disabled'}`}
-        aria-describedby="formal-skill-description"
-      >
-        <legend>{t('advanced.formalSkill' as any)}</legend>
-        <div className="skill-fieldset-header">
-          <div className="skill-fieldset-copy">
-            <p id="formal-skill-description">
-              {formalModeEnabled ? t('advanced.formalSkillHint' as any) : t('advanced.formalSkillDisabledHint' as any)}
-            </p>
+      {formalModeEnabled && (
+        <fieldset className="skill-fieldset" aria-describedby="formal-skill-description">
+          <legend>{t('advanced.formalSkill')}</legend>
+          <div className="skill-fieldset-header">
+            <div className="skill-fieldset-copy">
+              <p id="formal-skill-description">{t('advanced.formalSkillHint')}</p>
+            </div>
+            <span className="skill-state-badge is-active">{t('advanced.skillEnabled')}</span>
           </div>
-          <span className={`skill-state-badge${formalModeEnabled ? ' is-active' : ''}`}>
-            {formalModeEnabled ? t('advanced.skillEnabled' as any) : t('advanced.skillDisabled' as any)}
-          </span>
-        </div>
 
-        <div className="skill-grid" role="radiogroup" aria-label={t('advanced.formalSkill' as any)}>
-          {formalSceneOptions.map((option) => {
-            const checked = settings.formal_scene === option.value;
-            return (
-              <label
-                key={option.value}
-                className={`skill-card${checked ? ' is-selected' : ''}${formalModeEnabled ? '' : ' is-readonly'}`}
-              >
-                <input
-                  type="radio"
-                  name="formal-scene"
-                  value={option.value}
-                  checked={checked}
-                  aria-label={t(option.labelKey as any)}
-                  disabled={!formalModeEnabled}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      formal_scene: event.target.value as AppSettings['formal_scene']
-                    })
-                  }
-                />
-                <div className="skill-card-copy">
-                  <strong>{t(option.labelKey as any)}</strong>
-                  <span>{t(option.descriptionKey as any)}</span>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
+          <div className="skill-grid" role="radiogroup" aria-label={t('advanced.formalSkill')}>
+            {formalSceneOptions.map((option) => {
+              const checked = settings.formal_scene === option.value;
+              return (
+                <label key={option.value} className={`skill-card${checked ? ' is-selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="formal-scene"
+                    value={option.value}
+                    checked={checked}
+                    aria-label={t(option.labelKey)}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        formal_scene: event.target.value as AppSettings['formal_scene']
+                      })
+                    }
+                  />
+                  <div className="skill-card-copy">
+                    <strong>{t(option.labelKey)}</strong>
+                    <span>{t(option.descriptionKey)}</span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
 
       <label className="switch-row">
         <input

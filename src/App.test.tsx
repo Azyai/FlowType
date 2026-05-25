@@ -184,12 +184,11 @@ describe('FlowType settings shell', () => {
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
-    const emailSkill = screen.getByRole('radio', { name: 'Email drafting' });
-    expect(screen.getByText('Available in formal mode')).toBeInTheDocument();
-    expect(emailSkill).toBeDisabled();
+    expect(screen.queryByText('Formal writing skill')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Email drafting' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
+    const emailSkill = await screen.findByRole('radio', { name: 'Email drafting' });
     expect(await screen.findByText('Active in formal mode')).toBeInTheDocument();
-    expect(emailSkill).toBeEnabled();
     await user.click(emailSkill);
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
