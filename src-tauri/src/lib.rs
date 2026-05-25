@@ -20,11 +20,17 @@ use desktop::tray;
 use settings::ConfigStore;
 use storage::Database;
 use tauri::{Manager, WindowEvent};
+use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut log_targets = vec![Target::new(TargetKind::LogDir { file_name: None })];
+    if cfg!(debug_assertions) {
+        log_targets.push(Target::new(TargetKind::Webview));
+    }
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_log::Builder::new().targets(log_targets).build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
