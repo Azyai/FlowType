@@ -184,6 +184,8 @@ describe('FlowType settings shell', () => {
 
     await screen.findByRole('heading', { name: 'Hotkey' });
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getByText('Output')).toBeInTheDocument();
+    expect(screen.getByText('Display and floating window')).toBeInTheDocument();
     expect(screen.queryByText('Formal writing skill')).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Email drafting' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
@@ -191,6 +193,9 @@ describe('FlowType settings shell', () => {
     expect(await screen.findByText('Active in formal mode')).toBeInTheDocument();
     await user.click(emailSkill);
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
+    await user.click(screen.getByRole('checkbox', { name: 'Check for updates automatically' }));
+    expect(screen.getByRole('checkbox', { name: 'Keep floating window on top' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Enable floating window animation' })).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
     expect(screen.queryByRole('checkbox', { name: 'Keep floating window on top' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Enable floating window animation' })).not.toBeInTheDocument();
@@ -204,6 +209,7 @@ describe('FlowType settings shell', () => {
           output_style: 'formal',
           formal_scene: 'email',
           history_retention_days: 30,
+          auto_check_update: true,
           show_floating_window: false
         })
       );
