@@ -186,19 +186,39 @@ describe('FlowType settings shell', () => {
     await user.click(screen.getByRole('button', { name: 'Advanced' }));
     expect(screen.getByText('Output')).toBeInTheDocument();
     expect(screen.getByText('Display and floating window')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Raw transcript returns the ASR result directly and only trims obvious leading or trailing blanks.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Language stays aligned with the ASR result: Chinese remains Chinese, English remains English, and mixed input stays mixed.'
+      )
+    ).toBeInTheDocument();
     expect(screen.queryByText('Formal writing skill')).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Email drafting' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Output style'), 'formal');
     const emailSkill = await screen.findByRole('radio', { name: 'Email drafting' });
+    expect(
+      await screen.findByText(
+        'Formal writing uses the selected rewrite skill to polish the text while preserving the original language and intent.'
+      )
+    ).toBeInTheDocument();
     expect(await screen.findByText('Active in formal mode')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Selected skills must keep the same language pattern as the ASR text and must not force everything into a single language.'
+      )
+    ).toBeInTheDocument();
     await user.click(emailSkill);
     await user.selectOptions(screen.getByLabelText('History retention'), '30');
     await user.click(screen.getByRole('checkbox', { name: 'Check for updates automatically' }));
-    expect(screen.getByRole('checkbox', { name: 'Keep floating window on top' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Enable floating window animation' })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
+    expect(screen.getByLabelText('Floating window position')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Keep floating window on top' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Enable floating window animation' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Show floating pet window' }));
+    expect(screen.queryByLabelText('Floating window position')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear history' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));

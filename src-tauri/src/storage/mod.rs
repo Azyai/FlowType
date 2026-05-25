@@ -48,6 +48,17 @@ const MIGRATIONS: &[Migration] = &[
                OR COALESCE(TRIM(error_summary), '') <> '';
         "#,
     },
+    Migration {
+        id: 4,
+        name: "add_rewrite_metadata_to_transcript_history",
+        sql: r#"
+            ALTER TABLE transcript_history ADD COLUMN rewrite_provider TEXT;
+            ALTER TABLE transcript_history ADD COLUMN rewrite_model TEXT;
+            ALTER TABLE transcript_history ADD COLUMN formal_scene TEXT;
+            ALTER TABLE transcript_history ADD COLUMN rewrite_latency_ms INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE transcript_history ADD COLUMN rewrite_fallback_used INTEGER NOT NULL DEFAULT 0;
+        "#,
+    },
 ];
 
 #[derive(Debug)]
@@ -71,6 +82,11 @@ pub struct TranscriptHistoryRecord {
     pub raw_text: String,
     pub final_text: String,
     pub output_style: String,
+    pub rewrite_provider: Option<String>,
+    pub rewrite_model: Option<String>,
+    pub formal_scene: Option<String>,
+    pub rewrite_latency_ms: i64,
+    pub rewrite_fallback_used: bool,
     pub recognition_started_at: i64,
     pub recognition_duration_ms: i64,
     pub injected: bool,
@@ -98,6 +114,11 @@ pub struct NewTranscriptHistory<'a> {
     pub raw_text: &'a str,
     pub final_text: &'a str,
     pub output_style: &'a str,
+    pub rewrite_provider: Option<&'a str>,
+    pub rewrite_model: Option<&'a str>,
+    pub formal_scene: Option<&'a str>,
+    pub rewrite_latency_ms: i64,
+    pub rewrite_fallback_used: bool,
     pub recognition_started_at: &'a str,
     pub recognition_duration_ms: i64,
     pub injected: bool,
@@ -216,6 +237,11 @@ impl Database {
                 raw_text,
                 final_text,
                 output_style,
+                rewrite_provider,
+                rewrite_model,
+                formal_scene,
+                rewrite_latency_ms,
+                rewrite_fallback_used,
                 recognition_started_at,
                 recognition_duration_ms,
                 injected,
@@ -223,12 +249,17 @@ impl Database {
                 error_summary,
                 created_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             params![
                 entry.raw_text,
                 entry.final_text,
                 entry.output_style,
+                entry.rewrite_provider,
+                entry.rewrite_model,
+                entry.formal_scene,
+                entry.rewrite_latency_ms,
+                if entry.rewrite_fallback_used { 1 } else { 0 },
                 entry.recognition_started_at.parse::<i64>().unwrap_or_default(),
                 entry.recognition_duration_ms,
                 if entry.injected { 1 } else { 0 },
@@ -261,6 +292,11 @@ impl Database {
                 raw_text,
                 final_text,
                 output_style,
+                rewrite_provider,
+                rewrite_model,
+                formal_scene,
+                rewrite_latency_ms,
+                rewrite_fallback_used,
                 recognition_started_at,
                 recognition_duration_ms,
                 injected,
@@ -280,12 +316,17 @@ impl Database {
                 raw_text: row.get(1)?,
                 final_text: row.get(2)?,
                 output_style: row.get(3)?,
-                recognition_started_at: row.get(4)?,
-                recognition_duration_ms: row.get(5)?,
-                injected: row.get::<_, i64>(6)? != 0,
-                error_code: row.get(7)?,
-                error_summary: row.get(8)?,
-                created_at: row.get(9)?,
+                rewrite_provider: row.get(4)?,
+                rewrite_model: row.get(5)?,
+                formal_scene: row.get(6)?,
+                rewrite_latency_ms: row.get(7)?,
+                rewrite_fallback_used: row.get::<_, i64>(8)? != 0,
+                recognition_started_at: row.get(9)?,
+                recognition_duration_ms: row.get(10)?,
+                injected: row.get::<_, i64>(11)? != 0,
+                error_code: row.get(12)?,
+                error_summary: row.get(13)?,
+                created_at: row.get(14)?,
             })
         })?;
         let items = rows.collect::<Result<Vec<_>, _>>()?;
@@ -359,7 +400,7 @@ mod tests {
 
         assert!(path.exists());
         assert!(health.ok);
-        assert_eq!(health.applied_migrations, 3);
+        assert_eq!(health.applied_migrations, 4);
     }
 
     #[test]
@@ -370,7 +411,7 @@ mod tests {
         database.apply_migrations().unwrap();
         database.apply_migrations().unwrap();
 
-        assert_eq!(database.count_migrations().unwrap(), 3);
+        assert_eq!(database.count_migrations().unwrap(), 4);
     }
 
     #[test]
@@ -398,6 +439,11 @@ mod tests {
                 raw_text: "raw words",
                 final_text: "final words",
                 output_style: "raw",
+                rewrite_provider: Some("native"),
+                rewrite_model: None,
+                formal_scene: None,
+                rewrite_latency_ms: 0,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 1200,
                 injected: true,
@@ -419,6 +465,11 @@ mod tests {
                 raw_text: "raw words",
                 final_text: "final words",
                 output_style: "clean",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-flash"),
+                formal_scene: None,
+                rewrite_latency_ms: 420,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 900,
                 injected: false,
@@ -442,6 +493,11 @@ mod tests {
                 raw_text: "first",
                 final_text: "first",
                 output_style: "raw",
+                rewrite_provider: Some("native"),
+                rewrite_model: None,
+                formal_scene: None,
+                rewrite_latency_ms: 0,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 300,
                 injected: true,
@@ -454,6 +510,11 @@ mod tests {
                 raw_text: "second",
                 final_text: "second",
                 output_style: "clean",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-flash"),
+                formal_scene: None,
+                rewrite_latency_ms: 150,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000001",
                 recognition_duration_ms: 400,
                 injected: false,
@@ -480,6 +541,11 @@ mod tests {
                 raw_text: "oldest",
                 final_text: "oldest",
                 output_style: "raw",
+                rewrite_provider: Some("native"),
+                rewrite_model: None,
+                formal_scene: None,
+                rewrite_latency_ms: 0,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 100,
                 injected: true,
@@ -492,6 +558,11 @@ mod tests {
                 raw_text: "middle",
                 final_text: "middle",
                 output_style: "clean",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-flash"),
+                formal_scene: None,
+                rewrite_latency_ms: 210,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000001",
                 recognition_duration_ms: 200,
                 injected: false,
@@ -504,6 +575,11 @@ mod tests {
                 raw_text: "latest",
                 final_text: "latest",
                 output_style: "formal",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-pro"),
+                formal_scene: Some("email"),
+                rewrite_latency_ms: 330,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000002",
                 recognition_duration_ms: 300,
                 injected: true,
@@ -540,6 +616,7 @@ mod tests {
         assert_eq!(page.offset, 1);
         assert_eq!(page.items.len(), 1);
         assert_eq!(page.items[0].raw_text, "oldest");
+        assert_eq!(page.items[0].rewrite_provider.as_deref(), Some("native"));
     }
 
     #[test]
@@ -552,6 +629,11 @@ mod tests {
                 raw_text: "failed",
                 final_text: "",
                 output_style: "raw",
+                rewrite_provider: Some("native"),
+                rewrite_model: None,
+                formal_scene: None,
+                rewrite_latency_ms: 0,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 150,
                 injected: false,
@@ -581,6 +663,11 @@ mod tests {
                 raw_text: "expired",
                 final_text: "expired",
                 output_style: "raw",
+                rewrite_provider: Some("native"),
+                rewrite_model: None,
+                formal_scene: None,
+                rewrite_latency_ms: 0,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000000",
                 recognition_duration_ms: 100,
                 injected: false,
@@ -593,6 +680,11 @@ mod tests {
                 raw_text: "fresh",
                 final_text: "fresh",
                 output_style: "clean",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-flash"),
+                formal_scene: None,
+                rewrite_latency_ms: 90,
+                rewrite_fallback_used: false,
                 recognition_started_at: "1700000001",
                 recognition_duration_ms: 150,
                 injected: true,
@@ -623,5 +715,38 @@ mod tests {
         assert_eq!(deleted, 1);
         assert_eq!(page.total, 1);
         assert_eq!(page.items[0].raw_text, "fresh");
+    }
+
+    #[test]
+    fn transcript_history_persists_rewrite_metadata() {
+        let path = test_db_path("rewrite-metadata");
+        let database = Database::open(&path).unwrap();
+
+        database
+            .insert_transcript_history(NewTranscriptHistory {
+                raw_text: "你好",
+                final_text: "您好，请查收。",
+                output_style: "formal",
+                rewrite_provider: Some("deepseek"),
+                rewrite_model: Some("deepseek-v4-pro"),
+                formal_scene: Some("professional_reply"),
+                rewrite_latency_ms: 512,
+                rewrite_fallback_used: true,
+                recognition_started_at: "1700000000",
+                recognition_duration_ms: 280,
+                injected: true,
+                error_code: None,
+                error_summary: None,
+            })
+            .unwrap();
+
+        let page = database.get_transcript_history(10, 0).unwrap();
+
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items[0].rewrite_provider.as_deref(), Some("deepseek"));
+        assert_eq!(page.items[0].rewrite_model.as_deref(), Some("deepseek-v4-pro"));
+        assert_eq!(page.items[0].formal_scene.as_deref(), Some("professional_reply"));
+        assert_eq!(page.items[0].rewrite_latency_ms, 512);
+        assert!(page.items[0].rewrite_fallback_used);
     }
 }

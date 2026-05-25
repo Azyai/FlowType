@@ -6,6 +6,7 @@ pub mod state;
 
 use crate::{
     error::{AppError, AppResult},
+    llm,
     settings::{AppSettings, OutputStyle},
     storage::NewTranscriptHistory,
     voice::{
@@ -325,6 +326,14 @@ impl VoiceController {
                         false,
                         Some("ASR_EMPTY"),
                         Some(message.as_str()),
+                        &OutputRewrite {
+                            final_text: String::new(),
+                            provider: "native".to_string(),
+                            model: None,
+                            formal_scene: None,
+                            latency_ms: 0,
+                            fallback_used: false,
+                        },
                     );
                     state.fail_voice(&app, "ASR_EMPTY", "No speech text was recognized.");
                     return;
@@ -341,12 +350,21 @@ impl VoiceController {
                         false,
                         Some("ASR_FAILED"),
                         Some(message.as_str()),
+                        &OutputRewrite {
+                            final_text: String::new(),
+                            provider: "native".to_string(),
+                            model: None,
+                            formal_scene: None,
+                            latency_ms: 0,
+                            fallback_used: false,
+                        },
                     );
                     state.fail_voice(&app, "ASR_FAILED", message);
                     return;
                 }
             };
-            let final_text = transformed_output_text(&raw_text, &settings.output_style);
+            let rewrite = rewrite_output_text(&raw_text, &settings);
+            let final_text = rewrite.final_text.clone();
 
             let _ = state.transition_voice(&app, VoiceStatus::Injecting);
             match inject::inject_text(&final_text, &settings.clipboard_restore) {
@@ -365,6 +383,7 @@ impl VoiceController {
                         outcome.injected(),
                         outcome.error_code.as_deref(),
                         history_error_summary,
+                        &rewrite,
                     );
                     state.emit_voice_event(&app, VoiceSessionEvent::final_text(final_text));
                     emit_text_injection_event(&app, outcome.into());
@@ -383,12 +402,62 @@ impl VoiceController {
                         false,
                         Some(code.as_str()),
                         Some(message.as_str()),
+                        &rewrite,
                     );
                     emit_text_injection_event(&app, failure.clone().into());
                     state.fail_voice(&app, code.as_str(), message);
                 }
             }
         });
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OutputRewrite {
+    final_text: String,
+    provider: String,
+    model: Option<String>,
+    formal_scene: Option<String>,
+    latency_ms: i64,
+    fallback_used: bool,
+}
+
+fn rewrite_output_text(raw_text: &str, settings: &AppSettings) -> OutputRewrite {
+    if matches!(settings.output_style, OutputStyle::Raw) {
+        return OutputRewrite {
+            final_text: transformed_output_text(raw_text, &settings.output_style),
+            provider: "native".to_string(),
+            model: None,
+            formal_scene: None,
+            latency_ms: 0,
+            fallback_used: false,
+        };
+    }
+
+    match llm::rewrite_text(raw_text, settings.output_style, settings.formal_scene) {
+        Ok(result) => OutputRewrite {
+            final_text: result.text.trim().to_string(),
+            provider: result.provider.to_string(),
+            model: result.model.map(|model| model.as_str().to_string()),
+            formal_scene: result.scene.map(formal_scene_label),
+            latency_ms: result.latency_ms.min(i64::MAX as u128) as i64,
+            fallback_used: result.fallback_used,
+        },
+        Err(error) => {
+            log::warn!("llm rewrite failed, falling back to native transform: {error}");
+            OutputRewrite {
+                final_text: transformed_output_text(raw_text, &settings.output_style),
+                provider: "native".to_string(),
+                model: None,
+                formal_scene: if matches!(settings.output_style, OutputStyle::Formal) {
+                    Some(formal_scene_label(settings.formal_scene))
+                } else {
+                    None
+                },
+                latency_ms: 0,
+                fallback_used: true,
+            }
+        }
     }
 }
 
@@ -411,6 +480,7 @@ fn record_history_if_enabled(
     injected: bool,
     error_code: Option<&str>,
     error_summary: Option<&str>,
+    rewrite: &OutputRewrite,
 ) {
     if !settings.save_history || !should_record_history_entry(error_code, error_summary) {
         return;
@@ -420,6 +490,11 @@ fn record_history_if_enabled(
         raw_text,
         final_text,
         output_style: output_style_label(&settings.output_style),
+        rewrite_provider: Some(rewrite.provider.as_str()),
+        rewrite_model: rewrite.model.as_deref(),
+        formal_scene: rewrite.formal_scene.as_deref(),
+        rewrite_latency_ms: rewrite.latency_ms,
+        rewrite_fallback_used: rewrite.fallback_used,
         recognition_started_at,
         recognition_duration_ms,
         injected,
@@ -439,6 +514,15 @@ fn output_style_label(output_style: &OutputStyle) -> &'static str {
         OutputStyle::Raw => "raw",
         OutputStyle::Clean => "clean",
         OutputStyle::Formal => "formal",
+    }
+}
+
+fn formal_scene_label(scene: crate::settings::FormalScene) -> String {
+    match scene {
+        crate::settings::FormalScene::General => "general".to_string(),
+        crate::settings::FormalScene::Email => "email".to_string(),
+        crate::settings::FormalScene::Greeting => "greeting".to_string(),
+        crate::settings::FormalScene::ProfessionalReply => "professional_reply".to_string(),
     }
 }
 
@@ -510,5 +594,30 @@ mod tests {
         assert!(should_record_history_entry(None, Some("   ")));
         assert!(!should_record_history_entry(Some("ASR_EMPTY"), None));
         assert!(!should_record_history_entry(None, Some("No speech text was recognized.")));
+    }
+
+    #[test]
+    fn raw_mode_rewrite_metadata_stays_native_without_fallback() {
+        let settings = AppSettings::default();
+
+        let rewrite = rewrite_output_text("  hello world  ", &settings);
+
+        assert_eq!(rewrite.final_text, "hello world");
+        assert_eq!(rewrite.provider, "native");
+        assert_eq!(rewrite.model, None);
+        assert_eq!(rewrite.formal_scene, None);
+        assert_eq!(rewrite.latency_ms, 0);
+        assert!(!rewrite.fallback_used);
+    }
+
+    #[test]
+    fn formal_scene_label_uses_saved_setting_keys() {
+        assert_eq!(formal_scene_label(crate::settings::FormalScene::General), "general");
+        assert_eq!(formal_scene_label(crate::settings::FormalScene::Email), "email");
+        assert_eq!(formal_scene_label(crate::settings::FormalScene::Greeting), "greeting");
+        assert_eq!(
+            formal_scene_label(crate::settings::FormalScene::ProfessionalReply),
+            "professional_reply"
+        );
     }
 }

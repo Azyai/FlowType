@@ -30,6 +30,12 @@ const formalSceneOptions: Array<{
   }
 ];
 
+const outputStyleDescriptionKeys: Record<AppSettings['output_style'], TranslationKey> = {
+  raw: 'advanced.outputStyleRawHint',
+  clean: 'advanced.outputStyleCleanHint',
+  formal: 'advanced.outputStyleFormalHint'
+};
+
 export function AdvancedPage({
   settings,
   setSettings,
@@ -46,6 +52,7 @@ export function AdvancedPage({
   const { t } = useI18n();
   const formalModeEnabled = settings.output_style === 'formal';
   const recordingRangeInvalid = settings.max_recording_ms < settings.min_recording_ms;
+  const outputStyleDescriptionKey = outputStyleDescriptionKeys[settings.output_style];
 
   const updateSettings = (patch: Partial<AppSettings>) => {
     setSettings({ ...settings, ...patch });
@@ -74,12 +81,16 @@ export function AdvancedPage({
           </select>
         </label>
 
+        <p className="helper-text">{t(outputStyleDescriptionKey)}</p>
+        <p className="helper-text">{t('advanced.languageConsistencyHint')}</p>
+
         {formalModeEnabled && (
           <fieldset className="skill-fieldset" aria-describedby="formal-skill-description">
             <legend>{t('advanced.formalSkill')}</legend>
             <div className="skill-fieldset-header">
               <div className="skill-fieldset-copy">
                 <p id="formal-skill-description">{t('advanced.formalSkillHint')}</p>
+                <p>{t('advanced.formalSkillLanguageHint')}</p>
               </div>
               <span className="skill-state-badge is-active">{t('advanced.skillEnabled')}</span>
             </div>
@@ -161,32 +172,6 @@ export function AdvancedPage({
                 <option value="cursor_nearby">{t('advanced.nearCursor')}</option>
               </select>
             </label>
-
-            <div className="switch-stack">
-              <label className="switch-row">
-                <input
-                  type="checkbox"
-                  checked={settings.floating_window_always_on_top}
-                  onChange={(event) =>
-                    updateSettings({ floating_window_always_on_top: event.target.checked })
-                  }
-                  aria-label={t('advanced.floatingAlwaysOnTop')}
-                />
-                <span>{t('advanced.floatingAlwaysOnTop')}</span>
-              </label>
-
-              <label className="switch-row">
-                <input
-                  type="checkbox"
-                  checked={settings.floating_window_animation_enabled}
-                  onChange={(event) =>
-                    updateSettings({ floating_window_animation_enabled: event.target.checked })
-                  }
-                  aria-label={t('advanced.floatingAnimation')}
-                />
-                <span>{t('advanced.floatingAnimation')}</span>
-              </label>
-            </div>
           </div>
         )}
       </section>
